@@ -22,14 +22,14 @@ export const metadata: Metadata = {
     title: "Quai Supply Tracker",
     description:
       "Live and historical Quai & Qi token supply, burns, unlocks, and mining emissions.",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
+    images: [{ url: "/opengraph-image.png", width: 256, height: 256 }],
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "Quai Supply Tracker",
     description:
       "Live and historical Quai & Qi token supply, burns, unlocks, and mining emissions.",
-    images: ["/opengraph-image"],
+    images: ["/opengraph-image.png"],
   },
 };
 
