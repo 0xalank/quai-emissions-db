@@ -19,7 +19,7 @@ const SOAP_BURN_ADDRESS_URL = `https://quaiscan.io/address/${SOAP_BURN_ADDRESS}`
 //   [DOMINANT] Circulating QUAI             (live, from /api/supply, +30d sparkline)
 //   • Total SOAP burn                       (live)
 //   • Net issuance · 7d                     (derived from 30d window)
-//   • Genesis + mined · 30d                 (component view of issuance)
+//   • Mined + genesis · 30d                 (component view of issuance)
 //   • Genesis allocation after Singularity  (static constant)
 //   • Singularity Burn                      (static constant)
 //
@@ -198,28 +198,36 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
 
   const issuanceSources: HeroCard = {
     id: "issuance-sources-30d",
-    label: "Genesis + mined · 30d",
+    label: "Mined + genesis · 30d",
     value: (
-      <>
-        {thirtyDayGenesisUnlocked == null
-          ? "—"
-          : formatCompact(weiToFloat(thirtyDayGenesisUnlocked, 0))}
-        <span className="ml-1 text-sm font-normal text-slate-900/55 dark:text-white/55">
-          QUAI
+      <span className="grid w-full grid-cols-2 gap-3">
+        <span>
+          <span className="block text-[0.65rem] font-normal uppercase tracking-wider text-slate-900/50 dark:text-white/45">
+            Mined
+          </span>
+          <span className="block">
+            {thirtyDayMined == null
+              ? "—"
+              : formatCompact(weiToFloat(thirtyDayMined, 0))}
+            <span className="ml-1 text-sm font-normal text-slate-900/55 dark:text-white/55">
+              QUAI
+            </span>
+          </span>
         </span>
-      </>
-    ),
-    numericValue:
-      thirtyDayGenesisUnlocked == null
-        ? undefined
-        : weiToFloat(thirtyDayGenesisUnlocked, 0),
-    sub: (
-      <>
-        Mined{" "}
-        {thirtyDayMined == null
-          ? "—"
-          : `${formatCompact(weiToFloat(thirtyDayMined, 0))} QUAI`}
-      </>
+        <span>
+          <span className="block text-[0.65rem] font-normal uppercase tracking-wider text-slate-900/50 dark:text-white/45">
+            Genesis
+          </span>
+          <span className="block">
+            {thirtyDayGenesisUnlocked == null
+              ? "—"
+              : formatCompact(weiToFloat(thirtyDayGenesisUnlocked, 0))}
+            <span className="ml-1 text-sm font-normal text-slate-900/55 dark:text-white/55">
+              QUAI
+            </span>
+          </span>
+        </span>
+      </span>
     ),
     loading,
     accent: "purple",
