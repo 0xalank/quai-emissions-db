@@ -4,9 +4,9 @@ import { ReferenceLine } from "recharts";
 // chart's X-axis dataKey ("date"), which is also YYYY-MM-DD period_start.
 export const PROTOCOL_EVENTS = [
   { date: "2025-04-16", label: "Qi Launch", color: "#14b8a6", slug: "qi" },
-  { date: "2025-12-17", label: "SOAP", color: "#f97316", slug: "soap" },
+  { date: "2025-12-17", label: "SOAP", color: "#f0a16d", slug: "soap" },
   { date: "2026-02-03", label: "1Y Cliff", color: "#a855f7", slug: "1y-cliff" },
-  { date: "2026-03-19", label: "Singularity", color: "#3b82f6", slug: "singularity" },
+  { date: "2026-03-19", label: "Singularity", color: "#e20101", slug: "singularity" },
 ] as const;
 
 export type ProtocolEventSlug = (typeof PROTOCOL_EVENTS)[number]["slug"];

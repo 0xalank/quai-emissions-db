@@ -1,4 +1,4 @@
-# Quai Emissions Dashboard
+# Quai Supply Tracker
 
 A Next.js dashboard tracking QUAI and Qi token emissions on the Quai Network
 `cyprus1` zone. Combines a live Postgres-backed ingest worker (in tail mode

@@ -22,10 +22,13 @@ export function TopNav() {
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/"
-            className="shrink-0 font-display text-sm font-semibold tracking-tight"
+            className="flex shrink-0 items-center gap-2 font-display text-sm font-semibold uppercase tracking-[0.02em]"
           >
-            <span className="text-quai-500 dark:text-quai-400">Quai</span>{" "}
-            <span className="text-slate-900 dark:text-ink-50/90">Emissions</span>
+            <QuaiMark />
+            <span className="text-quai-500">Quai</span>
+            <span className="text-slate-900 dark:text-white/90">
+              Supply Tracker
+            </span>
           </Link>
           <span
             aria-hidden
@@ -39,6 +42,25 @@ export function TopNav() {
         </div>
       </div>
     </nav>
+  );
+}
+
+function QuaiMark() {
+  return (
+    <span
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black shadow-glow"
+      aria-hidden
+    >
+      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
+        <circle cx="9.25" cy="12" r="6.75" fill="#e20101" />
+        <circle cx="14.75" cy="12" r="6.75" fill="#ffffff" fillOpacity="0.92" />
+        <path
+          d="M12 6.85A6.73 6.73 0 0 1 12 17.15A6.73 6.73 0 0 1 12 6.85Z"
+          fill="black"
+          fillOpacity="0.1"
+        />
+      </svg>
+    </span>
   );
 }
 
@@ -71,4 +93,3 @@ function StatusCluster() {
     </div>
   );
 }
-

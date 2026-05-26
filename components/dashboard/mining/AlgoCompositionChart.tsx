@@ -20,8 +20,8 @@ import { ChartLegend } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 const ALGO_COMPOSITION_LEGEND = [
-  { label: "KawPoW", color: "#3b82f6" },
-  { label: "SHA", color: "#f97316" },
+  { label: "KawPoW", color: "#e20101" },
+  { label: "SHA", color: "#f0a16d" },
   { label: "Scrypt", color: "#10b981" },
   { label: "ProgPoW (legacy)", color: "#94a3b8" },
 ];
@@ -74,7 +74,7 @@ export function AlgoCompositionChart({
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
-          <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
+          <div className="text-sm text-quai-600 dark:text-quai-400">{String(error)}</div>
         ) : data.length === 0 ? (
           <div className="text-sm text-slate-900/50 dark:text-white/50">
             No rollup data in this range.
@@ -117,8 +117,8 @@ export function AlgoCompositionChart({
                 dataKey="kawpow"
                 name="KawPoW"
                 stackId="algo"
-                stroke="#3b82f6"
-                fill="#3b82f6"
+                stroke="#e20101"
+                fill="#e20101"
                 fillOpacity={0.7}
                 isAnimationActive
                 animationDuration={500}
@@ -129,8 +129,8 @@ export function AlgoCompositionChart({
                 dataKey="sha"
                 name="SHA"
                 stackId="algo"
-                stroke="#f97316"
-                fill="#f97316"
+                stroke="#f0a16d"
+                fill="#f0a16d"
                 fillOpacity={0.7}
                 isAnimationActive
                 animationDuration={500}

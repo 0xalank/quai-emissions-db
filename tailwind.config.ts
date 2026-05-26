@@ -1,9 +1,7 @@
 import type { Config } from "tailwindcss";
 
-// Theme aligned with the Quai Network official surfaces (qu.ai, soap.qu.ai,
-// docs.qu.ai). The brand is unmistakably **warm-dark**: near-black bg with
-// a brown undertone, cream off-white text, brand red `#e22901` for primary
-// signal, warm-amber accents. See globals.css for the matching CSS vars.
+// Theme aligned with quai-website-nextjs: true black dark mode, Quai red,
+// and the website's local Yapari / Bai Jamjuree / Monorama font stack.
 const config: Config = {
   darkMode: "class",
   content: [
@@ -14,20 +12,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Brand red — primary signal color across qu.ai/soap.qu.ai/docs.qu.ai.
-        // Anchored on `#e22901` (docs canonical) with `#c70000` for pressed.
+        // Quai website red.
         quai: {
-          50:  "#fff1ed",
-          100: "#ffdcd1",
-          200: "#ffb8a3",
-          300: "#ff8a6c",
-          400: "#ff5c3d",
-          500: "#e22901", // brand
-          600: "#c70000", // hover/pressed
-          700: "#a30000",
-          800: "#7d0000",
-          900: "#560000",
-          950: "#330000",
+          50: "#fff1f1",
+          100: "#ffdada",
+          200: "#ffb3b3",
+          300: "#ff8080",
+          400: "#ff4747",
+          500: "#e20101",
+          600: "#c40000",
+          700: "#990000",
+          800: "#710000",
+          900: "#4c0000",
+          950: "#260000",
         },
         // Warm amber accent — used around CTAs, eyebrow ticks, secondary signal.
         amber: {
@@ -48,26 +45,25 @@ const config: Config = {
           600: "#059669",
           700: "#047857",
         },
-        // Surface palette — warm-tinted near-black with brown undertone.
-        // Use these instead of slate/zinc for any panel-style surface.
+        // Surface palette — neutral black / near-black for dashboard dark mode.
         ink: {
-          DEFAULT: "#0d0a0b", // page bg dark
-          50:  "#f6e8dc",     // text primary on dark
-          100: "#e6d3c2",
-          200: "#d0b29e",     // text muted
-          300: "#a8866d",
-          400: "#785338",
-          500: "#3e1c11",     // panel base
-          600: "#25120d",     // surface raised
-          700: "#170b07",     // canvas dark
-          800: "#0d0a0b",     // page bg
-          900: "#070506",
+          DEFAULT: "#000000",
+          50: "#ffffff",
+          100: "#dcdcdc",
+          200: "#a1a1a1",
+          300: "#878787",
+          400: "#646464",
+          500: "#393939",
+          600: "#161616",
+          700: "#0d0d0d",
+          800: "#080808",
+          900: "#000000",
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "Space Grotesk", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["var(--font-mono)", "JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        sans: ["Bai Jamjuree", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["YapariSemBd", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["Monorama", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       borderRadius: {
         DEFAULT: "4px",
@@ -75,9 +71,8 @@ const config: Config = {
         lg: "8px",
       },
       boxShadow: {
-        // Signature hover/focus glow — `0 0 8px rgba(226,1,1,.45)` per brief.
-        glow: "0 0 8px rgba(226, 41, 1, 0.45)",
-        "glow-strong": "0 0 16px rgba(226, 41, 1, 0.55)",
+        glow: "0 0 8px rgba(226, 1, 1, 0.45)",
+        "glow-strong": "0 0 16px rgba(226, 1, 1, 0.55)",
         // Soft ambient panel shadow.
         panel: "0 30px 80px -30px rgba(0, 0, 0, 0.55)",
       },

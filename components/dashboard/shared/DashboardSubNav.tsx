@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/dashboard", label: "Home", exact: true },
   { href: "/dashboard/mining", label: "Mining" },
+  { href: "/dashboard/faq", label: "FAQs" },
 ];
 
 function isActive(pathname: string | null, t: { href: string; exact?: boolean }) {

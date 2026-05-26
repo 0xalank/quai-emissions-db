@@ -52,8 +52,8 @@ export type HeroCard = {
 };
 
 const ACCENT_BORDER: Record<HeroAccent, string> = {
-  blue: "border-l-blue-500/80 dark:border-l-blue-400/70",
-  orange: "border-l-orange-500/80 dark:border-l-orange-400/70",
+  blue: "border-l-quai-500/80 dark:border-l-quai-500/80",
+  orange: "border-l-amber-300/80 dark:border-l-amber-300/80",
   emerald: "border-l-emerald-500/80 dark:border-l-emerald-400/70",
   amber: "border-l-amber-500/80 dark:border-l-amber-400/70",
   purple: "border-l-purple-500/80 dark:border-l-purple-400/70",
@@ -61,8 +61,8 @@ const ACCENT_BORDER: Record<HeroAccent, string> = {
 };
 
 const ACCENT_LABEL: Record<HeroAccent, string> = {
-  blue: "text-blue-700 dark:text-blue-300",
-  orange: "text-orange-700 dark:text-orange-300",
+  blue: "text-quai-600 dark:text-quai-400",
+  orange: "text-amber-600 dark:text-amber-300",
   emerald: "text-emerald-700 dark:text-emerald-300",
   amber: "text-amber-700 dark:text-amber-300",
   purple: "text-purple-700 dark:text-purple-300",
@@ -70,8 +70,8 @@ const ACCENT_LABEL: Record<HeroAccent, string> = {
 };
 
 const ACCENT_HEX: Record<HeroAccent, string> = {
-  blue: "#3b82f6",
-  orange: "#f97316",
+  blue: "#e20101",
+  orange: "#f0a16d",
   emerald: "#10b981",
   amber: "#f59e0b",
   purple: "#a855f7",

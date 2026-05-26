@@ -120,7 +120,7 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
         href={SOAP_BURN_ADDRESS_URL}
         target="_blank"
         rel="noreferrer"
-        className="break-all underline decoration-orange-500/40 underline-offset-2 hover:text-orange-700 dark:hover:text-orange-300"
+        className="break-all underline decoration-amber-300/40 underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300"
       >
         {SOAP_BURN_ADDRESS}
       </a>

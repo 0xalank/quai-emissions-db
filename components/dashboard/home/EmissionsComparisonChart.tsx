@@ -18,8 +18,8 @@ import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { ChartLegend } from "@/components/ui/ChartLegend";
 
 const EMISSIONS_COMPARISON_LEGEND = [
-  { label: "QUAI % of cap", color: "#3b82f6" },
-  { label: "BTC % of cap", color: "#f97316" },
+  { label: "QUAI % of cap", color: "#e20101" },
+  { label: "BTC % of cap", color: "#f0a16d" },
 ];
 import {
   BTC_CAP,
@@ -271,23 +271,23 @@ export function EmissionsComparisonChart() {
             {/* "Now" lines — one per network, at their respective year-since-genesis. */}
             <ReferenceLine
               x={btcYearsNow}
-              stroke="#f97316"
+              stroke="#f0a16d"
               strokeOpacity={0.7}
               label={{
                 value: `BTC now · Y${btcYearsNow.toFixed(1)}`,
                 position: "insideTopRight",
-                fill: "#f97316",
+                fill: "#f0a16d",
                 fontSize: 10,
               }}
             />
             <ReferenceLine
               x={quaiYearsNow}
-              stroke="#3b82f6"
+              stroke="#e20101"
               strokeOpacity={0.7}
               label={{
                 value: `QUAI now · Y${quaiYearsNow.toFixed(1)}`,
                 position: "insideTopRight",
-                fill: "#3b82f6",
+                fill: "#e20101",
                 fontSize: 10,
               }}
             />
@@ -295,13 +295,13 @@ export function EmissionsComparisonChart() {
             {/* QUAI cap target — end of QUAI projection (year ~4). */}
             <ReferenceLine
               x={quaiCapYear}
-              stroke="#3b82f6"
+              stroke="#e20101"
               strokeOpacity={0.4}
               strokeDasharray="2 2"
               label={{
                 value: "QUAI cap",
                 position: "insideTopRight",
-                fill: "#3b82f6",
+                fill: "#e20101",
                 fontSize: 10,
               }}
             />
@@ -311,7 +311,7 @@ export function EmissionsComparisonChart() {
               <ReferenceLine
                 key={y}
                 x={y}
-                stroke="#f97316"
+                stroke="#f0a16d"
                 strokeOpacity={0.35}
                 strokeDasharray="2 2"
                 label={
@@ -319,7 +319,7 @@ export function EmissionsComparisonChart() {
                     ? {
                         value: "BTC halvings",
                         position: "insideTopLeft",
-                        fill: "#f97316",
+                        fill: "#f0a16d",
                         fontSize: 10,
                       }
                     : undefined
@@ -331,7 +331,7 @@ export function EmissionsComparisonChart() {
               type="monotone"
               dataKey="quaiPct"
               name="QUAI % of cap"
-              stroke="#3b82f6"
+              stroke="#e20101"
               strokeWidth={1.6}
               dot={false}
               isAnimationActive
@@ -342,7 +342,7 @@ export function EmissionsComparisonChart() {
               type="monotone"
               dataKey="btcPct"
               name="BTC % of cap"
-              stroke="#f97316"
+              stroke="#f0a16d"
               strokeWidth={1.6}
               dot={false}
               isAnimationActive

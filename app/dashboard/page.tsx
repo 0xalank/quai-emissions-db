@@ -28,7 +28,7 @@ export default function DashboardHomePage() {
   const flagshipTo = todayIso();
 
   useEffect(() => {
-    document.title = "Quai · Home";
+    document.title = "Quai Supply Tracker";
   }, []);
 
   return (

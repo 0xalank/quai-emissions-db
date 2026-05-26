@@ -24,7 +24,7 @@ import { ChartLegend } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 const BLOCK_REWARD_LEGEND = [
-  { label: "Base block reward", color: "#3b82f6" },
+  { label: "Base block reward", color: "#e20101" },
   { label: "Per-workshare reward", color: "#a855f7", dasharray: "3 3" },
 ];
 
@@ -56,7 +56,7 @@ export function BlockRewardChart({ from, to }: { from: string; to: string }) {
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
-          <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
+          <div className="text-sm text-quai-600 dark:text-quai-400">{String(error)}</div>
         ) : data.length === 0 ? (
           <div className="text-sm text-slate-900/50 dark:text-white/50">No rollup data.</div>
         ) : (
@@ -94,7 +94,7 @@ export function BlockRewardChart({ from, to }: { from: string; to: string }) {
                 }
               />
               <ProtocolEventLines visibleFrom={from} visibleTo={to} />
-              <Line type="monotone" dataKey="base" name="Base block reward" stroke="#3b82f6" strokeWidth={1.6} dot={false} isAnimationActive animationDuration={500} animationEasing="ease-out" />
+              <Line type="monotone" dataKey="base" name="Base block reward" stroke="#e20101" strokeWidth={1.6} dot={false} isAnimationActive animationDuration={500} animationEasing="ease-out" />
               <Line type="monotone" dataKey="workshare" name="Per-workshare reward" stroke="#a855f7" strokeWidth={1.4} dot={false} strokeDasharray="3 3" isAnimationActive animationDuration={500} animationEasing="ease-out" />
             </LineChart>
           </ResponsiveContainer>

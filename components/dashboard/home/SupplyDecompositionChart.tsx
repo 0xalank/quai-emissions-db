@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 import { cumulativeUnlockedPostSingularity } from "@/lib/quai/genesis-schedule";
 
 const DECOMPOSITION_LEGEND = [
-  { label: "Eaten by SOAP burn", color: "#f97316", dasharray: "4 3" },
+  { label: "Eaten by SOAP burn", color: "#f0a16d", dasharray: "4 3" },
   { label: "Genesis (unlocked)", color: "#a855f7" },
   { label: "Mined (gross)", color: "#06b6d4" },
 ];
@@ -241,7 +241,7 @@ export function SupplyDecompositionChart({
                 top minus burn overlay.
               </li>
               <li>
-                <span className="font-medium text-orange-600 dark:text-orange-300">
+                <span className="font-medium text-amber-600 dark:text-amber-300">
                   Eaten by burn
                 </span>{" "}
                 (overlay): <code>burnClose</code>. Drawn as a separate hatched
@@ -286,7 +286,7 @@ export function SupplyDecompositionChart({
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
-          <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
+          <div className="text-sm text-quai-600 dark:text-quai-400">{String(error)}</div>
         ) : data.length === 0 ? (
           <div className="text-sm text-slate-900/50 dark:text-white/50">
             No supply data in this range.
@@ -302,13 +302,13 @@ export function SupplyDecompositionChart({
                   height="6"
                   patternTransform="rotate(45)"
                 >
-                  <rect width="6" height="6" fill="#f97316" fillOpacity={0.18} />
+                  <rect width="6" height="6" fill="#f0a16d" fillOpacity={0.18} />
                   <line
                     x1="0"
                     y1="0"
                     x2="0"
                     y2="6"
-                    stroke="#f97316"
+                    stroke="#f0a16d"
                     strokeWidth="2.5"
                     strokeOpacity={0.85}
                   />
@@ -416,7 +416,7 @@ export function SupplyDecompositionChart({
                 dataKey="burn"
                 name="Eaten by SOAP burn"
                 stackId="burn"
-                stroke="#f97316"
+                stroke="#f0a16d"
                 strokeWidth={1.4}
                 strokeDasharray="4 3"
                 fill="url(#soap-burn-stripes-decomp)"

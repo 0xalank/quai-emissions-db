@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/components/QueryProvider";
 import { TopNav } from "@/components/layout/TopNav";
@@ -8,34 +7,30 @@ import {
   THEME_INIT_SCRIPT,
 } from "@/components/providers/ThemeProvider";
 
-// Brand-aligned fonts. Quai's official sites use Yapari (display) + Bai
-// Jamjuree (body) + Monorama (mono) — none of which are open-licensed for
-// embedding. The closest free substitutes preserve the tech-futurist feel:
-//   • Space Grotesk — geometric display, similar weight curve to Yapari
-//   • Inter         — the de facto humanist sans for product UI
-//   • JetBrains Mono — terminal-flavored mono for data + eyebrow labels
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-sans",
-});
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-display",
-  weight: ["500", "600", "700"],
-});
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-mono",
-  weight: ["400", "500", "600"],
-});
-
 export const metadata: Metadata = {
-  title: "Quai Emissions Dashboard",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  ),
+  title: "Quai Supply Tracker",
   description:
     "Live and historical Quai & Qi token emissions on Quai Network (cyprus1).",
+  icons: {
+    icon: "/brand/quai-mark.svg",
+    apple: "/brand/quai-mark.svg",
+  },
+  openGraph: {
+    title: "Quai Supply Tracker",
+    description:
+      "Live and historical Quai & Qi token emissions on Quai Network (cyprus1).",
+    images: [{ url: "/opengraph-image.png", width: 256, height: 256 }],
+  },
+  twitter: {
+    card: "summary",
+    title: "Quai Supply Tracker",
+    description:
+      "Live and historical Quai & Qi token emissions on Quai Network (cyprus1).",
+    images: ["/opengraph-image.png"],
+  },
 };
 
 export default function RootLayout({
@@ -47,7 +42,6 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
     >
       <head>
         {/* Runs before React hydration so the correct `dark` class is on

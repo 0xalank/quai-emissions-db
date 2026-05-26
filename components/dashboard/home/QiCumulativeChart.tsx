@@ -63,7 +63,7 @@ export function QiCumulativeChart({
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
-          <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
+          <div className="text-sm text-quai-600 dark:text-quai-400">{String(error)}</div>
         ) : data.length === 0 ? (
           <div className="text-sm text-slate-900/50 dark:text-white/50">
             No Qi supply data in this range.

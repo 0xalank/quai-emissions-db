@@ -21,8 +21,8 @@ import { ChartLegend } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 const QUAI_PER_ALGO_LEGEND = [
-  { label: "KawPoW (block + workshare)", color: "#3b82f6" },
-  { label: "SHA (workshare)", color: "#f97316" },
+  { label: "KawPoW (block + workshare)", color: "#e20101" },
+  { label: "SHA (workshare)", color: "#f0a16d" },
   { label: "Scrypt (workshare)", color: "#10b981" },
 ];
 
@@ -101,7 +101,7 @@ export function QuaiPerAlgoChart({
             </p>
             <ul className="mt-1 list-disc pl-4 text-slate-900/70 dark:text-white/70">
               <li>
-                <span className="font-medium text-blue-600 dark:text-blue-300">
+                <span className="font-medium text-quai-600 dark:text-quai-400">
                   KawPoW
                 </span>{" "}
                 = (<code>base_block_reward_sum</code> +{" "}
@@ -109,7 +109,7 @@ export function QuaiPerAlgoChart({
                 <code>winner_quai_count / block_count</code>
               </li>
               <li>
-                <span className="font-medium text-orange-600 dark:text-orange-300">
+                <span className="font-medium text-amber-600 dark:text-amber-300">
                   SHA / Scrypt
                 </span>{" "}
                 = <code>workshare_reward_avg × ws_&lt;algo&gt;_sum</code> ×{" "}
@@ -138,7 +138,7 @@ export function QuaiPerAlgoChart({
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
-          <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
+          <div className="text-sm text-quai-600 dark:text-quai-400">{String(error)}</div>
         ) : data.length === 0 ? (
           <div className="text-sm text-slate-900/50 dark:text-white/50">
             No rollup data in this range.
@@ -183,8 +183,8 @@ export function QuaiPerAlgoChart({
                 dataKey="kawpow"
                 name="KawPoW (block + workshare)"
                 stackId="quai"
-                stroke="#3b82f6"
-                fill="#3b82f6"
+                stroke="#e20101"
+                fill="#e20101"
                 fillOpacity={0.7}
                 isAnimationActive
                 animationDuration={500}
@@ -195,8 +195,8 @@ export function QuaiPerAlgoChart({
                 dataKey="sha"
                 name="SHA (workshare)"
                 stackId="quai"
-                stroke="#f97316"
-                fill="#f97316"
+                stroke="#f0a16d"
+                fill="#f0a16d"
                 fillOpacity={0.7}
                 isAnimationActive
                 animationDuration={500}

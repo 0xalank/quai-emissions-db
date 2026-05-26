@@ -184,13 +184,13 @@ export function SoapMiningChart({ to }: { to: string }) {
           color: "#10b981",
           dasharray: "4 3",
         },
-        { label: "Cumulative issued (sim)", color: "#3b82f6" },
+        { label: "Cumulative issued (sim)", color: "#e20101" },
         { label: "Cumulative unlocked (sim)", color: "#a855f7" },
-        { label: "Cumulative SOAP burn", color: "#f97316" },
+        { label: "Cumulative SOAP burn", color: "#f0a16d" },
       ]
     : [
-        { label: "Cumulative QUAI mined", color: "#3b82f6" },
-        { label: "Cumulative SOAP burn", color: "#f97316" },
+        { label: "Cumulative QUAI mined", color: "#e20101" },
+        { label: "Cumulative SOAP burn", color: "#f0a16d" },
         { label: "Net (mined − burned)", color: "#10b981", dasharray: "3 3" },
       ];
 
@@ -277,7 +277,7 @@ export function SoapMiningChart({ to }: { to: string }) {
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
-          <div className="text-sm text-red-600 dark:text-red-300">
+          <div className="text-sm text-quai-600 dark:text-quai-400">
             {String(error)}
           </div>
         ) : chartData.length <= 1 ? (
@@ -345,7 +345,7 @@ export function SoapMiningChart({ to }: { to: string }) {
                     ? "Cumulative issued (sim)"
                     : "Cumulative QUAI mined"
                 }
-                stroke="#3b82f6"
+                stroke="#e20101"
                 strokeWidth={1.6}
                 dot={false}
                 isAnimationActive
@@ -369,7 +369,7 @@ export function SoapMiningChart({ to }: { to: string }) {
                 type="monotone"
                 dataKey="burned"
                 name="Cumulative SOAP burn"
-                stroke="#f97316"
+                stroke="#f0a16d"
                 strokeWidth={1.6}
                 dot={false}
                 isAnimationActive
@@ -400,7 +400,7 @@ export function SoapMiningChart({ to }: { to: string }) {
           <span>Latest {formatPeriodDate(last.date)}:</span>
           <span>
             {showSimSeries ? "issued" : "mined"}{" "}
-            <span className="font-mono text-blue-600 dark:text-blue-300">
+            <span className="font-mono text-quai-600 dark:text-quai-400">
               {formatCompact(last.mined)} QUAI
             </span>
           </span>
@@ -414,7 +414,7 @@ export function SoapMiningChart({ to }: { to: string }) {
           )}
           <span>
             burned{" "}
-            <span className="font-mono text-orange-600 dark:text-orange-300">
+            <span className="font-mono text-amber-600 dark:text-amber-300">
               {formatCompact(last.burned)} QUAI
             </span>
           </span>

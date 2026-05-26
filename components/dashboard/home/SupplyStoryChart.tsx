@@ -28,7 +28,7 @@ import {
 } from "@/lib/comparisons/quai-projection";
 
 const SUPPLY_STORY_LEGEND = [
-  { label: "Circulating", color: "#3b82f6" },
+  { label: "Circulating", color: "#e20101" },
   { label: "Forecast", color: "#14b8a6", dasharray: "5 4" },
 ];
 
@@ -106,12 +106,12 @@ export function SupplyStoryChart({
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
-        <CardTitle>QUAI supply story</CardTitle>
+        <CardTitle>Circulating QUAI Supply</CardTitle>
         <InfoPopover label="About the supply story">
           <p className="font-medium">Circulating supply plus forecast</p>
           <ul className="mt-1 list-disc pl-4 text-slate-900/70 dark:text-white/70">
             <li>
-              <span className="font-medium text-blue-600 dark:text-blue-300">
+              <span className="font-medium text-quai-600 dark:text-quai-400">
                 Circulating
               </span>
               : <code>quaiSupplyTotal</code> from the RPC. Already net of SOAP
@@ -142,7 +142,7 @@ export function SupplyStoryChart({
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
-          <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
+          <div className="text-sm text-quai-600 dark:text-quai-400">{String(error)}</div>
         ) : data.length === 0 ? (
           <div className="text-sm text-slate-900/50 dark:text-white/50">
             No supply data in this range.
@@ -187,8 +187,8 @@ export function SupplyStoryChart({
                 dataKey="realized"
                 name="Circulating"
                 stackId="supply"
-                stroke="#3b82f6"
-                fill="#3b82f6"
+                stroke="#e20101"
+                fill="#e20101"
                 fillOpacity={0.5}
                 connectNulls={false}
                 isAnimationActive

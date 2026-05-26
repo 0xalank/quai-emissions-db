@@ -22,8 +22,8 @@ import { cn } from "@/lib/utils";
 type Algo = "kawpow" | "sha" | "scrypt";
 
 const ALGOS: ReadonlyArray<{ key: Algo; label: string; color: string }> = [
-  { key: "kawpow", label: "KawPoW", color: "#3b82f6" },
-  { key: "sha", label: "SHA", color: "#f97316" },
+  { key: "kawpow", label: "KawPoW", color: "#e20101" },
+  { key: "sha", label: "SHA", color: "#f0a16d" },
   { key: "scrypt", label: "Scrypt", color: "#10b981" },
 ];
 
@@ -95,7 +95,7 @@ export function HashrateChart({ from, to }: { from: string; to: string }) {
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
-          <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
+          <div className="text-sm text-quai-600 dark:text-quai-400">{String(error)}</div>
         ) : data.length === 0 ? (
           <div className="text-sm text-slate-900/50 dark:text-white/50">
             No rollup data.

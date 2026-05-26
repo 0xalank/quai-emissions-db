@@ -2,72 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme aligned with the Quai Network official surfaces (qu.ai, soap.qu.ai,
-   docs.qu.ai). Dark-by-default warm-ember palette with brand red `#e22901`
-   as the primary signal color. CSS variables are consumed by Recharts
-   props and the .card/.card-title component classes; Tailwind `dark:`
-   prefix handles the rest of the palette via the ramps in tailwind.config.ts. */
+@font-face {
+  font-family: "YapariSemBd";
+  src: url("/fonts/Yapari-SemiBold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Monorama";
+  src: url("/fonts/Monorama-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Bai Jamjuree";
+  src: url("/fonts/BaiJamjuree-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+/* Theme aligned with quai-website-nextjs. Dark mode is true black with Quai
+   red `#e20101`; panels stay neutral black/near-black for dashboard clarity.
+   CSS variables are consumed by Recharts props and shared component classes. */
 
 :root {
   color-scheme: light;
 
-  --background: #fbf7f3;
-  --foreground: #1a0e08;
+  --background: #f7f2ee;
+  --foreground: #0b0b0b;
 
   --card-bg: #ffffff;
-  --card-border: rgba(40, 18, 10, 0.08);
+  --card-border: rgba(0, 0, 0, 0.10);
 
-  --nav-bg: rgba(251, 247, 243, 0.85);
-  --nav-border: rgba(40, 18, 10, 0.10);
+  --nav-bg: rgba(247, 242, 238, 0.88);
+  --nav-border: rgba(0, 0, 0, 0.12);
 
   --popover-bg: #ffffff;
-  --popover-border: rgba(40, 18, 10, 0.14);
-  --popover-text: #1a0e08;
+  --popover-border: rgba(0, 0, 0, 0.14);
+  --popover-text: #0b0b0b;
 
-  --brand-red: #e22901;
-  --brand-red-deep: #c70000;
-  --brand-amber: #a84f26;
+  --brand-red: #e20101;
+  --brand-red-deep: #b80000;
+  --brand-amber: #f0a16d;
 
   /* Chart styling — passed through to Recharts props as `var(--...)` strings
      so the SVG inherits the current theme at render time. */
-  --chart-grid: rgba(40, 18, 10, 0.08);
-  --chart-grid-soft: rgba(40, 18, 10, 0.04);
-  --chart-axis: rgba(40, 18, 10, 0.55);
-  --chart-axis-muted: rgba(40, 18, 10, 0.4);
+  --chart-grid: rgba(0, 0, 0, 0.08);
+  --chart-grid-soft: rgba(0, 0, 0, 0.04);
+  --chart-axis: rgba(0, 0, 0, 0.55);
+  --chart-axis-muted: rgba(0, 0, 0, 0.4);
   --chart-tooltip-bg: #ffffff;
-  --chart-tooltip-border: rgba(40, 18, 10, 0.14);
-  --chart-tooltip-text: #1a0e08;
-  --chart-reference-line: rgba(40, 18, 10, 0.3);
+  --chart-tooltip-border: rgba(0, 0, 0, 0.14);
+  --chart-tooltip-text: #0b0b0b;
+  --chart-reference-line: rgba(0, 0, 0, 0.3);
 }
 
 .dark {
   color-scheme: dark;
 
-  --background: #0d0a0b;
-  --foreground: #f6e8dc;
+  --background: #000000;
+  --foreground: #ffffff;
 
-  --card-bg: rgba(62, 28, 17, 0.45);
-  --card-border: rgba(255, 219, 191, 0.10);
+  --card-bg: #080808;
+  --card-border: rgba(255, 255, 255, 0.12);
 
-  --nav-bg: rgba(13, 10, 11, 0.85);
-  --nav-border: rgba(255, 219, 191, 0.10);
+  --nav-bg: rgba(0, 0, 0, 0.88);
+  --nav-border: rgba(255, 255, 255, 0.12);
 
-  --popover-bg: #170b07;
-  --popover-border: rgba(255, 219, 191, 0.14);
-  --popover-text: #f6e8dc;
+  --popover-bg: #090909;
+  --popover-border: rgba(255, 255, 255, 0.16);
+  --popover-text: #ffffff;
 
-  --brand-red: #e22901;
-  --brand-red-deep: #ff5656;
+  --brand-red: #e20101;
+  --brand-red-deep: #ff3d3d;
   --brand-amber: #f0a16d;
 
-  --chart-grid: rgba(255, 219, 191, 0.08);
-  --chart-grid-soft: rgba(255, 219, 191, 0.04);
-  --chart-axis: rgba(246, 232, 220, 0.55);
-  --chart-axis-muted: rgba(246, 232, 220, 0.4);
-  --chart-tooltip-bg: #170b07;
-  --chart-tooltip-border: rgba(255, 219, 191, 0.16);
-  --chart-tooltip-text: #f6e8dc;
-  --chart-reference-line: rgba(255, 219, 191, 0.3);
+  --chart-grid: rgba(255, 255, 255, 0.09);
+  --chart-grid-soft: rgba(255, 255, 255, 0.045);
+  --chart-axis: rgba(255, 255, 255, 0.55);
+  --chart-axis-muted: rgba(255, 255, 255, 0.4);
+  --chart-tooltip-bg: #090909;
+  --chart-tooltip-border: rgba(255, 255, 255, 0.16);
+  --chart-tooltip-text: #ffffff;
+  --chart-reference-line: rgba(255, 255, 255, 0.3);
 }
 
 html,
@@ -77,28 +99,20 @@ body {
   min-height: 100%;
 }
 
-/* Subtle warm-ember radial wash on the dark background — echoes the hero
-   gradients on qu.ai/soap.qu.ai without committing to a heavy marketing
-   look. Light mode keeps a flat surface. */
 .dark body {
-  background:
-    radial-gradient(1200px 600px at 70% -10%, rgba(226, 41, 1, 0.08), transparent 60%),
-    radial-gradient(900px 500px at 10% 10%, rgba(226, 41, 1, 0.04), transparent 55%),
-    var(--background);
+  background: var(--background);
   background-attachment: fixed;
 }
 
 body {
-  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
+  font-family: "Bai Jamjuree", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* Display face for hero titles; opt-in via `font-display` Tailwind utility
-   or the .display-heading class. */
 .display-heading {
-  font-family: var(--font-display), "Space Grotesk", ui-sans-serif, system-ui,
-    sans-serif;
-  letter-spacing: -0.01em;
+  font-family: "YapariSemBd", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .card {
@@ -112,24 +126,25 @@ body {
 
 .dark .card {
   background:
-    linear-gradient(180deg, rgba(255, 219, 191, 0.03) 0%, rgba(255, 219, 191, 0.01) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, rgba(255, 255, 255, 0.008) 100%),
     var(--card-bg);
   border: 1px solid var(--card-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 219, 191, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 1px 2px rgba(0, 0, 0, 0.4),
     0 24px 60px -30px rgba(0, 0, 0, 0.55);
 }
 
 .card-title {
   @apply text-base font-semibold tracking-tight;
-  font-family: var(--font-display), "Space Grotesk", ui-sans-serif, system-ui,
-    sans-serif;
-  color: rgba(26, 14, 8, 0.95);
+  font-family: "YapariSemBd", ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: rgba(0, 0, 0, 0.95);
 }
 
 .dark .card-title {
-  color: rgba(246, 232, 220, 0.96);
+  color: rgba(255, 255, 255, 0.96);
 }
 
 /* Tabular numerals — applied to KPI / value cells to keep monospaced
@@ -142,15 +157,14 @@ body {
 /* Mono-eyebrow labels — small uppercase data-style headers, matches the
    "01 / 03" pattern on qu.ai's marketing surfaces. */
 .eyebrow {
-  font-family: var(--font-mono), ui-monospace, "JetBrains Mono", monospace;
+  font-family: "Monorama", ui-monospace, monospace;
   font-size: 10px;
-  font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(168, 134, 109, 0.9);
+  color: rgba(100, 100, 100, 0.9);
 }
 .dark .eyebrow {
-  color: rgba(208, 178, 158, 0.7);
+  color: rgba(161, 161, 161, 0.8);
 }
 
 /* Chart loading shimmer. Skeleton component sweeps a soft highlight across
