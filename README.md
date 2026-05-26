@@ -78,7 +78,7 @@ The example file (`.env.local.example`) is the canonical reference. The
 
 | command | what it does |
 |---|---|
-| `npm run db:up` | Start the local Postgres container from `docker-compose.yml`. |
+| `npm run db:up` | Start the local Postgres container from `docker-compose.yml` on host port 5433. |
 | `npm run db:down` | Stop the local Docker compose stack. |
 | `npm run validate:env` | Validate `.env.local` values and fail on placeholder or malformed `DATABASE_URL`. |
 | `npm run doctor` | Check Node version, env, RPC connectivity, DB connectivity, applied migrations, and key table counts. |

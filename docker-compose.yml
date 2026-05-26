@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: quai_emissions
       POSTGRES_PASSWORD: quai_emissions_dev
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - quai-emissions-postgres:/var/lib/postgresql/data
     healthcheck:
