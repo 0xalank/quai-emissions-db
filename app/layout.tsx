@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   ),
   title: "Quai Supply Tracker",
   description:
-    "Live and historical Quai & Qi token emissions on Quai Network (cyprus1).",
+    "Live and historical Quai & Qi token supply, burns, unlocks, and mining emissions.",
   icons: {
     icon: "/brand/quai-mark.svg",
     apple: "/brand/quai-mark.svg",
@@ -21,15 +21,15 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Quai Supply Tracker",
     description:
-      "Live and historical Quai & Qi token emissions on Quai Network (cyprus1).",
-    images: [{ url: "/opengraph-image.png", width: 256, height: 256 }],
+      "Live and historical Quai & Qi token supply, burns, unlocks, and mining emissions.",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Quai Supply Tracker",
     description:
-      "Live and historical Quai & Qi token emissions on Quai Network (cyprus1).",
-    images: ["/opengraph-image.png"],
+      "Live and historical Quai & Qi token supply, burns, unlocks, and mining emissions.",
+    images: ["/opengraph-image"],
   },
 };
 
