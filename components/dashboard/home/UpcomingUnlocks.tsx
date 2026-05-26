@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
+import { useSupply } from "@/lib/hooks";
 import { formatCompact, formatPeriodDate, weiToFloat } from "@/lib/format";
 import {
   dateOfScheduleMonth,
@@ -17,9 +18,30 @@ type UnlockRow = {
   amount: bigint;
 };
 
+function formatUnlockPct(amount: bigint, circulatingSupply: bigint | null): string {
+  if (!circulatingSupply || circulatingSupply <= 0n) return "—";
+  const milliPct = (amount * 100_000n) / circulatingSupply;
+  const whole = milliPct / 1000n;
+  const frac = (milliPct % 1000n).toString().padStart(3, "0");
+  return `${whole}.${frac}%`;
+}
+
 export function UpcomingUnlocks() {
+  const today = new Date().toISOString().slice(0, 10);
+  const supplyFrom = useMemo(() => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - 14);
+    return d.toISOString().slice(0, 10);
+  }, []);
+  const { data: latestSupply } = useSupply({
+    period: "day",
+    from: supplyFrom,
+    to: today,
+    include: [],
+  });
+  const circulatingSupply = latestSupply?.at(-1)?.realizedCirculatingQuai ?? null;
+
   const rows = useMemo<UnlockRow[]>(() => {
-    const today = new Date().toISOString().slice(0, 10);
     return POST_SINGULARITY_UNLOCK_SCHEDULE.map(
       ([month, amount]) => ({
         blockNumber: BigInt(month) * BLOCKS_PER_MONTH,
@@ -46,23 +68,31 @@ export function UpcomingUnlocks() {
               <tr>
                 <th className="py-2 pr-4 font-medium">Estimated date</th>
                 <th className="py-2 pr-4 font-medium">Block</th>
-                <th className="py-2 text-right font-medium">Unlock</th>
+                <th className="py-2 pr-4 text-right font-medium">Unlock</th>
+                <th className="py-2 text-right font-medium">
+                  Unlock % of circulating
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200/60 dark:divide-white/10">
-              {rows.map((row) => (
-                <tr key={row.blockNumber.toString()}>
-                  <td className="py-2.5 pr-4 font-medium text-slate-900 dark:text-white">
-                    {formatPeriodDate(row.date)}
-                  </td>
-                  <td className="py-2.5 pr-4 font-mono text-xs text-slate-900/55 dark:text-white/55">
-                    #{row.blockNumber.toLocaleString()}
-                  </td>
-                  <td className="py-2.5 text-right font-mono text-slate-900/75 dark:text-white/75">
-                    {formatCompact(weiToFloat(row.amount, 0))} QUAI
-                  </td>
-                </tr>
-              ))}
+              {rows.map((row) => {
+                return (
+                  <tr key={row.blockNumber.toString()}>
+                    <td className="py-2.5 pr-4 font-medium text-slate-900 dark:text-white">
+                      {formatPeriodDate(row.date)}
+                    </td>
+                    <td className="py-2.5 pr-4 font-mono text-xs text-slate-900/55 dark:text-white/55">
+                      #{row.blockNumber.toLocaleString()}
+                    </td>
+                    <td className="py-2.5 pr-4 text-right font-mono text-slate-900/75 dark:text-white/75">
+                      {formatCompact(weiToFloat(row.amount, 0))} QUAI
+                    </td>
+                    <td className="py-2.5 text-right font-mono text-slate-900/75 dark:text-white/75">
+                      {formatUnlockPct(row.amount, circulatingSupply)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
