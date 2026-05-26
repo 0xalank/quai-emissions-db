@@ -15,11 +15,11 @@ import { todayIso } from "@/components/dashboard/shared/TimeframeToggle";
 // (Qi launch, SOAP, 1Y Cliff, Singularity) is visible.
 const MAINNET_DATE = "2025-01-29";
 
-// Hero strip pulls a small fixed window so the 7-day delta is always
+// Hero strip pulls a small fixed window so the 30-day delta is always
 // computable, regardless of the flagship-chart range.
 const HERO_FROM = (() => {
   const d = new Date();
-  d.setUTCDate(d.getUTCDate() - 14);
+  d.setUTCDate(d.getUTCDate() - 30);
   return d.toISOString().slice(0, 10);
 })();
 
