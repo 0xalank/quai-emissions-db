@@ -59,7 +59,10 @@ sudo -u quai cp .env.local.example .env.local
 sudo -u quai $EDITOR .env.local              # set DATABASE_URL etc.
 
 sudo -u quai npm ci
+sudo -u quai npm run validate:env             # fails on placeholders / malformed DATABASE_URL
 sudo -u quai npm run migrate                  # apply schema
+sudo -u quai npm run backfill:smoke           # bounded DB/RPC sanity check
+sudo -u quai npm run doctor                   # env + RPC + DB + table counts
 sudo -u quai npm run build                    # required before next start
 ```
 
@@ -80,6 +83,7 @@ sudo systemctl enable --now quai-emissions-dashboard
 systemctl status quai-emissions-ingest quai-emissions-dashboard
 journalctl -u quai-emissions-ingest -f       # tail ingest logs
 journalctl -u quai-emissions-dashboard -f    # tail dashboard logs
+cd /srv/quai-emissions-db && sudo -u quai npm run deploy:check
 ```
 
 The ingest unit uses `Restart=on-failure` with backoff (5 failures in 5
@@ -132,6 +136,7 @@ sudo -u quai npm run build                   # rebuild
 sudo systemctl restart quai-emissions-dashboard
 # Ingest only needs a restart if scripts/ingest/* changed
 sudo systemctl restart quai-emissions-ingest
+sudo -u quai npm run deploy:check
 ```
 
 The migration runner is idempotent and transaction-wrapped — running it on

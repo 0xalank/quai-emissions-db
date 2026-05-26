@@ -193,7 +193,12 @@ async function ingestRange(
   from: number,
   to: number,
   opts: { safeHead: number; cursorBefore: number; sampleEvery: number },
-): Promise<{ blocks: number; sampled: number; miningInfo: number }> {
+): Promise<{
+  blocks: number;
+  sampled: number;
+  miningInfo: number;
+  dbWriteMs: number;
+}> {
   const expected = to - from + 1;
   const blockNums: number[] = [];
   for (let n = from; n <= to; n++) blockNums.push(n);
@@ -303,6 +308,7 @@ async function ingestRange(
   }
 
   // Order: blocks first (FK target), then analytics + mining_info.
+  const dbWriteStart = Date.now();
   await upsertBlocks(blockRows);
   await Promise.all([
     upsertAnalytics(analyticsRows),
@@ -310,10 +316,12 @@ async function ingestRange(
   ]);
   const highest = mergedBlocks[mergedBlocks.length - 1].number;
   await setCursor(highest, Math.min(highest, opts.safeHead));
+  const dbWriteMs = Date.now() - dbWriteStart;
   return {
     blocks: mergedBlocks.length,
     sampled: sampledBlocks.length,
     miningInfo: miningInfoRows.length,
+    dbWriteMs,
   };
 }
 
@@ -377,7 +385,12 @@ async function iterate(state: {
   backfillWroteBlocks: boolean;
   backfillStart: number;
   backfillStartedAt: number;
+  startedAt: number;
+  blocksWritten: number;
+  iterations: number;
+  errors: number;
 }): Promise<void> {
+  state.iterations++;
   const [cursor, head] = await Promise.all([
     getCursor(),
     getLatestBlockNumber(),
@@ -398,7 +411,7 @@ async function iterate(state: {
     const from = cursor.last_ingested_block + 1;
     const to = Math.min(safeHead, from + BACKFILL_CHUNK - 1);
     const chunkStart = Date.now();
-    const { blocks: n, sampled: s, miningInfo: mi } = await ingestRange(
+    const { blocks: n, sampled: s, miningInfo: mi, dbWriteMs } = await ingestRange(
       from,
       to,
       {
@@ -407,6 +420,7 @@ async function iterate(state: {
         sampleEvery: BACKFILL_SAMPLE_EVERY,
       },
     );
+    state.blocksWritten += n;
     state.backfillWroteBlocks ||= n > 0;
 
     const chunkElapsed = (Date.now() - chunkStart) / 1000;
@@ -415,10 +429,13 @@ async function iterate(state: {
     const rate = totalDone / Math.max(totalElapsed, 0.001);
     const remaining = safeHead - (cursor.last_ingested_block + n);
     const eta = rate > 0 ? remaining / rate : 0;
+    const lifetimeMinutes = Math.max((Date.now() - state.startedAt) / 60_000, 0.001);
+    const errorRate = state.errors / Math.max(state.iterations, 1);
     console.log(
       `[ingest] #${from}..#${to}  ${n} blocks  ${s} sampled  ${mi} mining_info  ` +
         `${chunkElapsed.toFixed(1)}s  ${(n / Math.max(chunkElapsed, 0.001)).toFixed(0)}/s  ` +
-        `ETA ${(eta / 60).toFixed(0)}m`,
+        `db=${dbWriteMs}ms lag=${remaining.toLocaleString()} blocks  ETA ${(eta / 60).toFixed(0)}m  ` +
+        `avg=${(state.blocksWritten / lifetimeMinutes).toFixed(0)} blocks/min errors=${state.errors}/${state.iterations} (${(errorRate * 100).toFixed(1)}%)`,
     );
   } else {
     if (state.mode !== "tail") {
@@ -449,15 +466,24 @@ async function iterate(state: {
       const prevCursor = (await getCursor()).last_ingested_block;
       const from = prevCursor + 1;
       const to = head;
-      const { blocks: n, miningInfo: mi } = await ingestRange(from, to, {
+      const tailStart = Date.now();
+      const { blocks: n, miningInfo: mi, dbWriteMs } = await ingestRange(from, to, {
         safeHead,
         cursorBefore: prevCursor,
         sampleEvery: 1, // tail mode: dense sample every block
       });
+      state.blocksWritten += n;
       if (n > 0) {
         await runRollups(prevCursor + 1);
+        const elapsed = (Date.now() - tailStart) / 1000;
+        const lag = Math.max(0, head - (prevCursor + n));
+        const lifetimeMinutes = Math.max((Date.now() - state.startedAt) / 60_000, 0.001);
+        const errorRate = state.errors / Math.max(state.iterations, 1);
         console.log(
-          `[ingest] tail: #${from}..#${to} (${n} blocks, ${mi} mining_info), rollups updated`,
+          `[ingest] tail: #${from}..#${to} (${n} blocks, ${mi} mining_info), ` +
+            `elapsed=${elapsed.toFixed(1)}s db=${dbWriteMs}ms lag=${lag} blocks ` +
+            `avg=${(state.blocksWritten / lifetimeMinutes).toFixed(0)} blocks/min ` +
+            `errors=${state.errors}/${state.iterations} (${(errorRate * 100).toFixed(1)}%), rollups updated`,
         );
       }
     }
@@ -476,14 +502,22 @@ async function main(): Promise<void> {
     backfillWroteBlocks: false,
     backfillStart: 0,
     backfillStartedAt: 0,
+    startedAt: Date.now(),
+    blocksWritten: 0,
+    iterations: 0,
+    errors: 0,
   };
 
   while (!shuttingDown) {
     try {
       await iterate(state);
     } catch (err) {
+      state.errors++;
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[ingest] iteration error: ${msg}`);
+      const errorRate = state.errors / Math.max(state.iterations, 1);
+      console.error(
+        `[ingest] iteration error: ${msg}  errors=${state.errors}/${state.iterations} (${(errorRate * 100).toFixed(1)}%)`,
+      );
       // Reset mode so transition-logging re-triggers after recovery
       state.mode = null;
       if (!shuttingDown) await sleep(ERROR_BACKOFF_MS);

@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { Client } from "pg";
 
 const MIGRATIONS_DIR = join(process.cwd(), "migrations");
+const MIGRATION_LOCK_KEY = "704650817386501242";
 
 async function main(): Promise<void> {
   const url = process.env.DATABASE_URL;
@@ -19,6 +20,11 @@ async function main(): Promise<void> {
   await client.connect();
 
   try {
+    console.log("waiting for migration lock...");
+    await client.query("SELECT pg_advisory_lock($1::bigint)", [
+      MIGRATION_LOCK_KEY,
+    ]);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         version    text PRIMARY KEY,
@@ -57,8 +63,7 @@ async function main(): Promise<void> {
       } catch (err) {
         await client.query("ROLLBACK");
         console.log("FAILED");
-        console.error(err);
-        process.exit(1);
+        throw err;
       }
     }
 
@@ -68,6 +73,9 @@ async function main(): Promise<void> {
       console.log(`applied ${appliedCount} migration(s).`);
     }
   } finally {
+    await client
+      .query("SELECT pg_advisory_unlock($1::bigint)", [MIGRATION_LOCK_KEY])
+      .catch(() => {});
     await client.end();
   }
 }

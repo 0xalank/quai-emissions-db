@@ -8,6 +8,7 @@ import { EmissionsComparisonChart } from "@/components/dashboard/home/EmissionsC
 import { QiCumulativeChart } from "@/components/dashboard/home/QiCumulativeChart";
 import { SingularityCallout } from "@/components/dashboard/home/SingularityCallout";
 import { SoapCallout } from "@/components/dashboard/home/SoapCallout";
+import { UpcomingUnlocks } from "@/components/dashboard/home/UpcomingUnlocks";
 import { todayIso } from "@/components/dashboard/shared/TimeframeToggle";
 
 // Mainnet date — earliest from-date so every protocol-event annotation
@@ -72,6 +73,7 @@ export default function DashboardHomePage() {
         <QiCumulativeChart from={flagshipFrom} to={flagshipTo} />
         <SoapMiningChart to={flagshipTo} />
         <EmissionsComparisonChart />
+        <UpcomingUnlocks />
       </div>
     </main>
   );

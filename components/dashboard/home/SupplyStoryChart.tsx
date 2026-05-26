@@ -9,8 +9,9 @@ import {
 } from "@/lib/format";
 import {
   Area,
-  AreaChart,
   CartesianGrid,
+  ComposedChart,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -21,24 +22,24 @@ import { InfoPopover } from "@/components/ui/InfoPopover";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { ChartLegend } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+import {
+  QUAI_CAP_DATE,
+  quaiProjectedSupplyAt,
+} from "@/lib/comparisons/quai-projection";
 
 const SUPPLY_STORY_LEGEND = [
-  { label: "Realized circulating", color: "#3b82f6" },
-  { label: "SOAP burn (overlay)", color: "#f97316", dasharray: "4 3" },
+  { label: "Circulating", color: "#3b82f6" },
+  { label: "Forecast", color: "#14b8a6", dasharray: "5 4" },
 ];
 
 // SupplyStoryChart — the home-page flagship.
-//   • realized (blue)   — quai_total_end, what's actually circulating
+//   • circulating (blue) — quai_total_end, what's actually circulating
 //                          (already net of SOAP burn at the RPC layer)
-//   • SOAP burn (orange) — balanceOf(0x0050AF…). Rendered as a separate
-//                          stack so it overlays the bottom of realized
-//                          rather than lifting it; visually subtractive,
-//                          matching SupplyDecompositionChart's treatment.
+//   • forecast (teal)    — linear projection from latest circulating to the
+//                          published 1.4B QUAI cap target by Feb 2029
 //
-// Top of the supply stack = realized circulating. The hatched orange wedge
-// at the floor marks "this much was minted then retired." Singularity Fork
-// is an annotation only — it eliminated FUTURE unlocks that were never
-// minted, so there's nothing to draw as a wedge.
+// The circulating line already has SOAP burn factored in at the RPC layer,
+// so this chart does not draw a separate burn overlay.
 
 export function SupplyStoryChart({
   from,
@@ -51,16 +52,53 @@ export function SupplyStoryChart({
     period: "day",
     from,
     to,
-    include: ["qi", "burn"],
+    include: ["qi"],
   });
 
   const chartData = useMemo(() => {
     if (!data) return [];
-    return data.map((r) => ({
+    const history = data.map((r) => ({
       date: r.periodStart,
       realized: weiToFloat(r.realizedCirculatingQuai, 0),
-      burn: weiToFloat(r.burnClose ?? 0n, 0),
+      forecast: null as number | null,
     }));
+    const last = data[data.length - 1];
+    if (!last) return history;
+
+    const anchor = {
+      date: new Date(last.periodStart + "T00:00:00Z"),
+      supply: last.realizedCirculatingQuai,
+    };
+    const forecast = [];
+    for (
+      let d = new Date(anchor.date);
+      d <= QUAI_CAP_DATE;
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
+    ) {
+      const iso = d.toISOString().slice(0, 10);
+      forecast.push({
+        date: iso,
+        realized: null as number | null,
+        forecast: weiToFloat(quaiProjectedSupplyAt(d, anchor), 0),
+      });
+    }
+    if (forecast[0]?.date === last.periodStart) {
+      forecast[0] = {
+        date: last.periodStart,
+        realized: weiToFloat(last.realizedCirculatingQuai, 0),
+        forecast: weiToFloat(last.realizedCirculatingQuai, 0),
+      };
+      return [...history.slice(0, -1), ...forecast];
+    }
+    return [
+      ...history,
+      {
+        date: last.periodStart,
+        realized: weiToFloat(last.realizedCirculatingQuai, 0),
+        forecast: weiToFloat(last.realizedCirculatingQuai, 0),
+      },
+      ...forecast,
+    ];
   }, [data]);
 
   const last = data?.[data.length - 1];
@@ -70,24 +108,22 @@ export function SupplyStoryChart({
       <div className="flex items-start justify-between gap-3">
         <CardTitle>QUAI supply story</CardTitle>
         <InfoPopover label="About the supply story">
-          <p className="font-medium">Two layers</p>
+          <p className="font-medium">Circulating supply plus forecast</p>
           <ul className="mt-1 list-disc pl-4 text-slate-900/70 dark:text-white/70">
             <li>
               <span className="font-medium text-blue-600 dark:text-blue-300">
-                Realized
+                Circulating
               </span>
               : <code>quaiSupplyTotal</code> from the RPC. Already net of SOAP
               burn server-side — no client-side subtraction. Top of the blue
               area is what's actually circulating today.
             </li>
             <li>
-              <span className="font-medium text-orange-600 dark:text-orange-300">
-                SOAP burn
+              <span className="font-medium text-teal-600 dark:text-teal-300">
+                Forecast
               </span>
-              : <code>balanceOf(0x0050AF…)</code>. The sole authoritative burn
-              signal. Drawn as a hatched overlay starting at the floor (y=0)
-              — visually subtractive, marking the slice of supply that's been
-              retired without lifting the realized line.
+              : a dashed projection from the latest circulating close to the
+              1.4B QUAI cap target on {QUAI_CAP_DATE.toISOString().slice(0, 10)}.
             </li>
           </ul>
           <p className="mt-2">
@@ -113,32 +149,7 @@ export function SupplyStoryChart({
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} syncId="home" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                {/* Diagonal-stripe pattern used as the SOAP-burn area fill.
-                    Visually signals "this would be circulating supply but
-                    has been subtracted off the top via burn" — the stripes
-                    read as "removed/voided" vs the solid blue realized
-                    circulating fill below. */}
-                <pattern
-                  id="soap-burn-stripes"
-                  patternUnits="userSpaceOnUse"
-                  width="6"
-                  height="6"
-                  patternTransform="rotate(45)"
-                >
-                  <rect width="6" height="6" fill="#f97316" fillOpacity={0.18} />
-                  <line
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="6"
-                    stroke="#f97316"
-                    strokeWidth="2.5"
-                    strokeOpacity={0.85}
-                  />
-                </pattern>
-              </defs>
+            <ComposedChart data={chartData} syncId="home" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid
                 stroke="var(--chart-grid-soft)"
                 strokeDasharray="2 4"
@@ -174,29 +185,30 @@ export function SupplyStoryChart({
               <Area
                 type="monotone"
                 dataKey="realized"
-                name="Realized circulating"
+                name="Circulating"
                 stackId="supply"
                 stroke="#3b82f6"
                 fill="#3b82f6"
                 fillOpacity={0.5}
+                connectNulls={false}
                 isAnimationActive
                 animationDuration={500}
                 animationEasing="ease-out"
               />
-              <Area
+              <Line
                 type="monotone"
-                dataKey="burn"
-                name="SOAP burn (overlay)"
-                stackId="burn"
-                stroke="#f97316"
-                strokeWidth={1.4}
-                strokeDasharray="4 3"
-                fill="url(#soap-burn-stripes)"
+                dataKey="forecast"
+                name="Forecast"
+                stroke="#14b8a6"
+                strokeWidth={2}
+                strokeDasharray="5 4"
+                dot={false}
+                connectNulls={false}
                 isAnimationActive
                 animationDuration={500}
                 animationEasing="ease-out"
               />
-            </AreaChart>
+            </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
@@ -204,27 +216,9 @@ export function SupplyStoryChart({
       {last && (
         <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-slate-900/50 dark:text-white/50">
           <span>
-            Latest {formatPeriodDate(last.periodStart)}: realized{" "}
+            Latest {formatPeriodDate(last.periodStart)}: circulating{" "}
             <span className="font-mono text-slate-900/80 dark:text-white/80">
               {formatCompact(weiToFloat(last.realizedCirculatingQuai, 0))} QUAI
-            </span>
-          </span>
-          <span>
-            burned{" "}
-            <span className="font-mono text-slate-900/80 dark:text-white/80">
-              {formatCompact(weiToFloat(last.burnClose ?? 0n, 0))} QUAI
-            </span>
-          </span>
-          <span>
-            gross{" "}
-            <span className="font-mono text-slate-900/80 dark:text-white/80">
-              {formatCompact(
-                weiToFloat(
-                  last.realizedCirculatingQuai + (last.burnClose ?? 0n),
-                  0,
-                ),
-              )}{" "}
-              QUAI
             </span>
           </span>
         </div>

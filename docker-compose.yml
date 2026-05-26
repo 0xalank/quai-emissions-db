@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: quai-emissions-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quaiemissions
+      POSTGRES_USER: quai_emissions
+      POSTGRES_PASSWORD: quai_emissions_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - quai-emissions-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quai_emissions -d quaiemissions"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  quai-emissions-postgres:

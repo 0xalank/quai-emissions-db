@@ -8,13 +8,18 @@ import {
   SINGULARITY_SKIP_QUAI,
 } from "@/lib/quai/protocol-constants";
 
+const POST_SINGULARITY_GENESIS_QUAI =
+  GENESIS_PREMINE_QUAI - SINGULARITY_SKIP_QUAI;
+const SOAP_BURN_ADDRESS = "0x0050AF0000000000000000000000000000000000";
+const SOAP_BURN_ADDRESS_URL = `https://quaiscan.io/address/${SOAP_BURN_ADDRESS}`;
+
 // HomeHero — five KPI cards leading the dashboard home page.
 //
-//   [DOMINANT] Realized circulating QUAI    (live, from /api/supply, +14d sparkline)
+//   [DOMINANT] Circulating QUAI             (live, from /api/supply, +14d sparkline)
 //   • Total SOAP burn                       (live)
 //   • Net issuance · 7d                     (derived from 14d window)
-//   • Genesis premine                       (static constant)
-//   • Singularity skip                      (static constant)
+//   • Genesis allocation after Singularity  (static constant)
+//   • Singularity Burn                      (static constant)
 //
 // The two static constants moved here from the now-removed /tokenomics
 // page so the dashboard surfaces them in one place. They never change but
@@ -59,7 +64,7 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
 
   const dominant: HeroCard = {
     id: "realized",
-    label: "Realized circulating QUAI",
+    label: "Circulating QUAI",
     value: latest ? (
       <>
         {formatCompact(weiToFloat(latest.realizedCirculatingQuai, 0))}
@@ -79,7 +84,7 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
 
   const qi: HeroCard = {
     id: "qi-realized",
-    label: "Realized circulating Qi",
+    label: "Circulating Qi",
     value: latest?.qiTotalEnd != null ? (
       <>
         {formatCompact(qitsToFloat(latest.qiTotalEnd, 0))}
@@ -110,7 +115,16 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
       "—"
     ),
     numericValue: burnFloat,
-    sub: "balanceOf(0x0050AF…) at last close.",
+    sub: (
+      <a
+        href={SOAP_BURN_ADDRESS_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="break-all underline decoration-orange-500/40 underline-offset-2 hover:text-orange-700 dark:hover:text-orange-300"
+      >
+        {SOAP_BURN_ADDRESS}
+      </a>
+    ),
     loading,
     accent: "orange",
   };
@@ -153,23 +167,23 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
 
   const premine: HeroCard = {
     id: "premine",
-    label: "Genesis premine",
+    label: "Genesis allocation",
     value: (
       <>
-        {formatCompact(weiToFloat(GENESIS_PREMINE_QUAI, 0))}
+        {formatCompact(weiToFloat(POST_SINGULARITY_GENESIS_QUAI, 0))}
         <span className="ml-1 text-sm font-normal text-slate-900/55 dark:text-white/55">
           QUAI
         </span>
       </>
     ),
-    numericValue: weiToFloat(GENESIS_PREMINE_QUAI, 0),
-    sub: "Allocated at block 0; vests over time.",
+    numericValue: weiToFloat(POST_SINGULARITY_GENESIS_QUAI, 0),
+    sub: "Post-Singularity genesis allocation; originally 3B QUAI.",
     accent: "slate",
   };
 
   const skip: HeroCard = {
     id: "skip",
-    label: "Singularity skip",
+    label: "Singularity Burn",
     value: (
       <>
         −{formatCompact(weiToFloat(SINGULARITY_SKIP_QUAI, 0))}
@@ -179,7 +193,7 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
       </>
     ),
     numericValue: weiToFloat(SINGULARITY_SKIP_QUAI, 0),
-    sub: "Future unlocks eliminated 2026-03-19.",
+    sub: `${formatCompact(weiToFloat(GENESIS_PREMINE_QUAI, 0))} genesis schedule reduced to ${formatCompact(weiToFloat(POST_SINGULARITY_GENESIS_QUAI, 0))}.`,
     accent: "amber",
   };
 

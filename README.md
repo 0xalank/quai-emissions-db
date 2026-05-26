@@ -19,14 +19,18 @@ the eventual maximum-supply trajectory vs. Bitcoin.
 # 1. install
 npm install
 
-# 2. configure environment
+# 2. start local Postgres, then configure environment
+npm run db:up
 cp .env.local.example .env.local
 $EDITOR .env.local        # set DATABASE_URL; QUAI_ZONE_RPC has a sane default
+npm run validate:env
 
 # 3. apply schema (eight migrations, idempotent, transaction-wrapped)
 npm run migrate
 
-# 4. start the ingest worker — tail mode after backfill
+# 4. first-run smoke test, then start the ingest worker
+npm run backfill:smoke    # bounded 1,000-block DB/RPC sanity check
+npm run doctor            # verifies env, RPC, DB, migrations, and table counts
 npm run ingest            # backfill from genesis, then tail head with 3s polling
 
 # 5. in another terminal, run the dashboard
@@ -74,15 +78,21 @@ The example file (`.env.local.example`) is the canonical reference. The
 
 | command | what it does |
 |---|---|
+| `npm run db:up` | Start the local Postgres container from `docker-compose.yml`. |
+| `npm run db:down` | Stop the local Docker compose stack. |
+| `npm run validate:env` | Validate `.env.local` values and fail on placeholder or malformed `DATABASE_URL`. |
+| `npm run doctor` | Check Node version, env, RPC connectivity, DB connectivity, applied migrations, and key table counts. |
 | `npm run dev` | Next.js dev server with Turbopack (port 3000). |
 | `npm run build` | Production build. |
 | `npm run start` | Serve the production build. |
 | `npm run typecheck` | `tsc --noEmit` across the entire repo. |
-| `npm run migrate` | Apply pending SQL migrations from `migrations/` in filename order. Tracked in `schema_migrations`; idempotent. |
+| `npm run migrate` | Validate env, take a Postgres advisory lock, then apply pending SQL migrations from `migrations/` in filename order. Tracked in `schema_migrations`; idempotent. |
 | `npm run reset:db` | **Destructive** — drops and recreates everything. Local-only convenience for full re-backfill. |
 | `npm run ingest` | Unified backfill + tail worker. Backfills from genesis to `(head − FINALITY_BUFFER)` in 10k-block chunks, then enters tail mode polling every 3 s. |
 | `npm run backfill` | Backfill-only worker (does not enter tail). Accepts `--limit=N` and `--chunk=N`. |
+| `npm run backfill:smoke` | Backfill-only smoke test capped at 1,000 blocks. Use this before starting the long-running ingest on a fresh VM. |
 | `npm run rollup` | Full rebuild of `rollups_daily/weekly/monthly`. Normally run automatically on each tail tick — invoke manually only if a column changes or you suspect drift. |
+| `npm run deploy:check` | Production host checklist for systemd service status, nginx config, and local `/api/health`. |
 
 ---
 
@@ -236,7 +246,12 @@ sudo chown -R quai:quai /srv/quai-emissions-db
 cd /srv/quai-emissions-db
 sudo -u quai cp .env.local.example .env.local
 sudo -u quai $EDITOR .env.local
-sudo -u quai npm ci && sudo -u quai npm run migrate && sudo -u quai npm run build
+sudo -u quai npm ci
+sudo -u quai npm run validate:env
+sudo -u quai npm run migrate
+sudo -u quai npm run backfill:smoke
+sudo -u quai npm run doctor
+sudo -u quai npm run build
 
 # Services + nginx
 sudo cp deploy/quai-emissions-{ingest,dashboard}.service /etc/systemd/system/
@@ -246,6 +261,7 @@ sudo $EDITOR /etc/nginx/sites-available/quai-emissions     # set server_name
 sudo systemctl daemon-reload
 sudo systemctl enable --now quai-emissions-ingest quai-emissions-dashboard
 sudo nginx -t && sudo systemctl reload nginx
+npm run deploy:check
 
 # TLS
 sudo apt install -y certbot python3-certbot-nginx

@@ -9,7 +9,7 @@ Plain-SQL migrations, applied in filename order by `scripts/migrate.ts`. One-way
 npm run migrate
 ```
 
-The runner tracks applied versions in a `schema_migrations` table (created on first run). Already-applied migrations are skipped. Each migration runs inside a transaction — on error, the whole file is rolled back and the runner exits non-zero.
+The runner takes a Postgres advisory lock for the migration session, then tracks applied versions in a `schema_migrations` table (created on first run). Already-applied migrations are skipped. Each migration runs inside a transaction — on error, the whole file is rolled back and the runner exits non-zero.
 
 ## Conventions
 
