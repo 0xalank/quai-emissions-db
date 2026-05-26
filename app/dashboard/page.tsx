@@ -15,8 +15,8 @@ import { todayIso } from "@/components/dashboard/shared/TimeframeToggle";
 // (Qi launch, SOAP, 1Y Cliff, Singularity) is visible.
 const MAINNET_DATE = "2025-01-29";
 
-// Hero strip pulls a small fixed window so the 30-day delta is always
-// computable, regardless of the flagship-chart range.
+// Hero strip pulls enough history for the 7-day net issuance card and the
+// separate 30-day genesis/mined issuance-source card.
 const HERO_FROM = (() => {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() - 30);

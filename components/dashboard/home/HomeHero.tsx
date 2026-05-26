@@ -18,7 +18,8 @@ const SOAP_BURN_ADDRESS_URL = `https://quaiscan.io/address/${SOAP_BURN_ADDRESS}`
 //
 //   [DOMINANT] Circulating QUAI             (live, from /api/supply, +30d sparkline)
 //   • Total SOAP burn                       (live)
-//   • Net issuance · 30d                    (derived from 30d window)
+//   • Net issuance · 7d                     (derived from 30d window)
+//   • Genesis + mined · 30d                 (component view of issuance)
 //   • Genesis allocation after Singularity  (static constant)
 //   • Singularity Burn                      (static constant)
 //
@@ -35,34 +36,44 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
     include: ["qi", "burn", "mined"],
   });
 
-  const { latest, thirtyDayDelta, thirtyDayGenesisUnlocked, thirtyDayMined, sparkData } =
-    useMemo(() => {
+  const {
+    latest,
+    sevenDayDelta,
+    thirtyDayGenesisUnlocked,
+    thirtyDayMined,
+    sparkData,
+  } = useMemo(() => {
     if (!data || data.length === 0) {
       return {
         latest: null,
-        thirtyDayDelta: null,
+        sevenDayDelta: null,
         thirtyDayGenesisUnlocked: null,
         thirtyDayMined: null,
         sparkData: [] as number[],
       };
     }
     const latest = data[data.length - 1];
-    const baseline = data[0];
-    const thirtyDayDelta =
-      latest.realizedCirculatingQuai - baseline.realizedCirculatingQuai;
+    const thirtyDayBaseline = data[0];
+    const sevenBackIdx = Math.max(0, data.length - 1 - 7);
+    const sevenDayBaseline = data[sevenBackIdx];
+    const sevenDayDelta =
+      latest.realizedCirculatingQuai -
+      sevenDayBaseline.realizedCirculatingQuai;
     const thirtyDayGenesisUnlocked =
       cumulativeUnlockedPostSingularity(latest.periodStart) -
-      cumulativeUnlockedPostSingularity(baseline.periodStart);
+      cumulativeUnlockedPostSingularity(thirtyDayBaseline.periodStart);
     const thirtyDayMined =
-      latest.cumulativeMinedQuai != null && baseline.cumulativeMinedQuai != null
-        ? latest.cumulativeMinedQuai - baseline.cumulativeMinedQuai
+      latest.cumulativeMinedQuai != null &&
+      thirtyDayBaseline.cumulativeMinedQuai != null
+        ? latest.cumulativeMinedQuai -
+          thirtyDayBaseline.cumulativeMinedQuai
         : null;
     // 30-day sparkline: the same window the hook fetched. Convert wei→float
     // once; MiniSparkline auto-scales y to data range.
     const sparkData = data.map((r) => weiToFloat(r.realizedCirculatingQuai, 0));
     return {
       latest,
-      thirtyDayDelta,
+      sevenDayDelta,
       thirtyDayGenesisUnlocked,
       thirtyDayMined,
       sparkData,
@@ -80,7 +91,7 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
     ? weiToFloat(latest.burnClose ?? 0n, 0)
     : undefined;
   const netFloat =
-    thirtyDayDelta == null ? undefined : weiToFloat(thirtyDayDelta, 0);
+    sevenDayDelta == null ? undefined : weiToFloat(sevenDayDelta, 0);
 
   const dominant: HeroCard = {
     id: "realized",
@@ -150,24 +161,24 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
   };
 
   const netSign =
-    thirtyDayDelta == null
+    sevenDayDelta == null
       ? null
-      : thirtyDayDelta > 0n
+      : sevenDayDelta > 0n
         ? "up"
-        : thirtyDayDelta < 0n
+        : sevenDayDelta < 0n
           ? "down"
           : "flat";
 
   const net: HeroCard = {
-    id: "net30d",
-    label: "Net issuance · 30d",
+    id: "net7d",
+    label: "Net issuance · 7d",
     value:
-      thirtyDayDelta == null ? (
+      sevenDayDelta == null ? (
         "—"
       ) : (
         <>
-          {thirtyDayDelta >= 0n ? "+" : "−"}
-          {formatCompact(Math.abs(weiToFloat(thirtyDayDelta, 0)))}
+          {sevenDayDelta >= 0n ? "+" : "−"}
+          {formatCompact(Math.abs(weiToFloat(sevenDayDelta, 0)))}
           <span className="ml-1 text-sm font-normal text-slate-900/55 dark:text-white/55">
             QUAI
           </span>
@@ -176,27 +187,42 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
     // Count-up uses absolute magnitude so the sign character in `value`
     // remains a static prefix; magnitude tweens naturally.
     numericValue: netFloat == null ? undefined : Math.abs(netFloat),
-    sub: (
-      <span className="block space-y-0.5">
-        <span className="block">Change in circulating over the last 30 days.</span>
-        <span className="block font-mono text-[0.68rem] text-slate-900/65 dark:text-white/65">
-          Genesis{" "}
-          {thirtyDayGenesisUnlocked == null
-            ? "—"
-            : `${formatCompact(weiToFloat(thirtyDayGenesisUnlocked, 0))} QUAI`}{" "}
-          · Mined{" "}
-          {thirtyDayMined == null
-            ? "—"
-            : `${formatCompact(weiToFloat(thirtyDayMined, 0))} QUAI`}
-        </span>
-      </span>
-    ),
+    sub: "Change in realized circulating over the last 7 days.",
     delta:
       netSign == null
         ? undefined
-        : { sign: netSign as "up" | "down" | "flat", text: "30d" },
+        : { sign: netSign as "up" | "down" | "flat", text: "7d" },
     loading,
     accent: "emerald",
+  };
+
+  const issuanceSources: HeroCard = {
+    id: "issuance-sources-30d",
+    label: "Genesis + mined · 30d",
+    value: (
+      <>
+        {thirtyDayGenesisUnlocked == null
+          ? "—"
+          : formatCompact(weiToFloat(thirtyDayGenesisUnlocked, 0))}
+        <span className="ml-1 text-sm font-normal text-slate-900/55 dark:text-white/55">
+          QUAI
+        </span>
+      </>
+    ),
+    numericValue:
+      thirtyDayGenesisUnlocked == null
+        ? undefined
+        : weiToFloat(thirtyDayGenesisUnlocked, 0),
+    sub: (
+      <>
+        Mined{" "}
+        {thirtyDayMined == null
+          ? "—"
+          : `${formatCompact(weiToFloat(thirtyDayMined, 0))} QUAI`}
+      </>
+    ),
+    loading,
+    accent: "purple",
   };
 
   const premine: HeroCard = {
@@ -232,6 +258,9 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
   };
 
   return (
-    <HeroStrip dominant={dominant} cards={[qi, burn, net, premine, skip]} />
+    <HeroStrip
+      dominant={dominant}
+      cards={[qi, burn, net, premine, skip, issuanceSources]}
+    />
   );
 }
