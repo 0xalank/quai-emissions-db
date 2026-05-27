@@ -1,5 +1,5 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { useSupply } from "@/lib/hooks";
 import {
@@ -23,6 +23,7 @@ import { InfoPopover } from "@/components/ui/InfoPopover";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { ChartLegend } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+import { cn } from "@/lib/utils";
 import { cumulativeUnlockedPostSingularity } from "@/lib/quai/genesis-schedule";
 
 const SUPPLY_STORY_LEGEND = [
@@ -66,6 +67,8 @@ export function SupplyStoryChart({
   from: string;
   to: string;
 }) {
+  const [forecast, setForecast] = useState(false);
+
   const { data, isLoading, error } = useSupply({
     period: "day",
     from,
@@ -81,14 +84,14 @@ export function SupplyStoryChart({
       forecast: null as number | null,
     }));
     const last = data[data.length - 1];
-    if (!last) return history;
+    if (!forecast || !last) return history;
 
     const anchorDate = last.periodStart;
     const scheduledAtAnchor = cumulativeUnlockedPostSingularity(anchorDate);
     const horizonDate = VESTING_END_DATE;
     const totalDays = Math.max(0, daysBetween(anchorDate, horizonDate));
 
-    const forecast: SupplyStoryPoint[] = [
+    const projection: SupplyStoryPoint[] = [
       {
         date: anchorDate,
         realized: weiToFloat(last.realizedCirculatingQuai, 0),
@@ -104,56 +107,76 @@ export function SupplyStoryChart({
           : 0n;
       const projected =
         last.realizedCirculatingQuai + scheduledDelta;
-      forecast.push({
+      projection.push({
         date: iso,
         realized: null as number | null,
         forecast: weiToFloat(projected, 0),
       });
     }
-    return [...history.slice(0, -1), ...forecast];
-  }, [data]);
+    return [...history.slice(0, -1), ...projection];
+  }, [data, forecast]);
 
   const last = data?.[data.length - 1];
   const visibleTo =
-    last && last.periodStart < VESTING_END_DATE ? VESTING_END_DATE : to;
+    forecast && last && last.periodStart < VESTING_END_DATE
+      ? VESTING_END_DATE
+      : to;
+  const legendItems = forecast
+    ? SUPPLY_STORY_LEGEND
+    : SUPPLY_STORY_LEGEND.filter((item) => item.label !== "Forecast");
 
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
         <CardTitle>Circulating QUAI Supply</CardTitle>
-        <InfoPopover label="About the supply story">
-          <p className="font-medium">Circulating supply plus forecast</p>
-          <ul className="mt-1 list-disc pl-4 text-slate-900/70 dark:text-white/70">
-            <li>
-              <span className="font-medium text-quai-600 dark:text-quai-400">
-                Circulating
-              </span>
-              : <code>quaiSupplyTotal</code> from the RPC. Already net of SOAP
-              burn server-side — no client-side subtraction. Top of the blue
-              area is what's actually circulating today.
-            </li>
-            <li>
-              <span className="font-medium text-teal-600 dark:text-teal-300">
-                Forecast
-              </span>
-              : a dashed daily projection from the latest circulating close,
-              adding only the remaining post-Singularity genesis unlock
-              schedule.
-            </li>
-          </ul>
-          <p className="mt-2">
-            <span className="font-medium">Singularity Fork (2026-03-19)</span>:
-            shown as an annotation only. The fork eliminated ~1.67 B QUAI of
-            future genesis unlocks; those allocations were never minted into
-            this curve, so there's nothing to subtract here. The effect lands
-            on eventual maximum supply, not on what's circulating today. The
-            forecast carries the remaining allowed unlocks forward through
-            {` ${VESTING_END_DATE}`}.
-          </p>
-        </InfoPopover>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setForecast((v) => !v)}
+            className={cn(
+              "rounded-md border px-2.5 py-1 text-xs font-medium transition",
+              forecast
+                ? "border-teal-500/60 bg-teal-500/10 text-teal-700 dark:border-teal-400/60 dark:bg-teal-400/10 dark:text-teal-200"
+                : "border-slate-300/70 text-slate-700 hover:bg-slate-100 dark:border-white/15 dark:text-white/70 dark:hover:bg-white/5",
+            )}
+            aria-pressed={forecast}
+          >
+            {forecast ? "Hide forecast" : "Show forecast"}
+          </button>
+          <InfoPopover label="About the supply story">
+            <p className="font-medium">Circulating supply plus forecast</p>
+            <ul className="mt-1 list-disc pl-4 text-slate-900/70 dark:text-white/70">
+              <li>
+                <span className="font-medium text-quai-600 dark:text-quai-400">
+                  Circulating
+                </span>
+                : <code>quaiSupplyTotal</code> from the RPC. Already net of SOAP
+                burn server-side — no client-side subtraction. Top of the blue
+                area is what's actually circulating today.
+              </li>
+              <li>
+                <span className="font-medium text-teal-600 dark:text-teal-300">
+                  Forecast
+                </span>
+                : a dashed daily projection from the latest circulating close,
+                adding only the remaining post-Singularity genesis unlock
+                schedule.
+              </li>
+            </ul>
+            <p className="mt-2">
+              <span className="font-medium">Singularity Fork (2026-03-19)</span>:
+              shown as an annotation only. The fork eliminated ~1.67 B QUAI of
+              future genesis unlocks; those allocations were never minted into
+              this curve, so there's nothing to subtract here. The effect lands
+              on eventual maximum supply, not on what's circulating today. The
+              forecast carries the remaining allowed unlocks forward through
+              {` ${VESTING_END_DATE}`}.
+            </p>
+          </InfoPopover>
+        </div>
       </div>
 
-      <ChartLegend items={SUPPLY_STORY_LEGEND} className="mt-3" />
+      <ChartLegend items={legendItems} className="mt-3" />
 
       <div className="mt-3 h-72 sm:h-80">
         {isLoading || !data ? (
@@ -199,7 +222,7 @@ export function SupplyStoryChart({
                 }
               />
               <ProtocolEventLines visibleFrom={from} visibleTo={visibleTo} />
-              {last && VESTING_END_DATE <= visibleTo && (
+              {forecast && last && VESTING_END_DATE <= visibleTo && (
                 <ReferenceLine
                   x={VESTING_END_DATE}
                   stroke="#a855f7"

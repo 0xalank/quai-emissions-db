@@ -19,15 +19,6 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const STORAGE_KEY = "theme";
 
-function detectInitialTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark") return stored;
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
-}
-
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
   if (theme === "dark") root.classList.add("dark");
@@ -45,20 +36,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       ? "dark"
       : "light";
     setTheme(domTheme);
-  }, []);
-
-  // Follow system preference IF the user hasn't explicitly chosen one.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = (e: MediaQueryListEvent) => {
-      if (window.localStorage.getItem(STORAGE_KEY)) return; // user preference overrides
-      const next: Theme = e.matches ? "dark" : "light";
-      applyTheme(next);
-      setTheme(next);
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   const toggle = useCallback(() => {
@@ -104,7 +81,7 @@ export const THEME_INIT_SCRIPT = `
     if (stored === 'light' || stored === 'dark') {
       theme = stored;
     } else {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      theme = 'dark';
     }
     if (theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');

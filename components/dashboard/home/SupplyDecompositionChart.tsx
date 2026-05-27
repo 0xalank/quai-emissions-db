@@ -67,7 +67,7 @@ export function SupplyDecompositionChart({
   from: string;
   to: string;
 }) {
-  const [forecast, setForecast] = useState(true);
+  const [forecast, setForecast] = useState(false);
 
   const { data, isLoading, error } = useSupply({
     period: "day",
