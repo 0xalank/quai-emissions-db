@@ -40,16 +40,11 @@ type SupplyStoryPoint = {
 //   • circulating (blue) — quai_total_end, what's actually circulating
 //                          (already net of SOAP burn at the RPC layer)
 //   • forecast (teal)    — daily projection from latest circulating, adding
-//                          future post-Singularity genesis unlocks plus a
-//                          steady net mining assumption.
+//                          future post-Singularity genesis unlocks only.
 //
 // The circulating line already has SOAP burn factored in at the RPC layer,
 // so this chart does not draw a separate burn overlay.
 
-const FORECAST_YEARS = 6;
-const MINING_PER_DAY_WEI = 800_000n * 10n ** 18n;
-const BURN_PER_DAY_WEI = (MINING_PER_DAY_WEI * 90n) / 100n;
-const NET_MINING_PER_DAY_WEI = MINING_PER_DAY_WEI - BURN_PER_DAY_WEI;
 const VESTING_END_DATE = "2029-01-08";
 
 function addDays(iso: string, days: number): string {
@@ -90,8 +85,8 @@ export function SupplyStoryChart({
 
     const anchorDate = last.periodStart;
     const scheduledAtAnchor = cumulativeUnlockedPostSingularity(anchorDate);
-    const horizonDate = addDays(anchorDate, FORECAST_YEARS * 365);
-    const totalDays = daysBetween(anchorDate, horizonDate);
+    const horizonDate = VESTING_END_DATE;
+    const totalDays = Math.max(0, daysBetween(anchorDate, horizonDate));
 
     const forecast: SupplyStoryPoint[] = [
       {
@@ -108,9 +103,7 @@ export function SupplyStoryChart({
           ? scheduledAtDate - scheduledAtAnchor
           : 0n;
       const projected =
-        last.realizedCirculatingQuai +
-        scheduledDelta +
-        NET_MINING_PER_DAY_WEI * BigInt(dayOffset);
+        last.realizedCirculatingQuai + scheduledDelta;
       forecast.push({
         date: iso,
         realized: null as number | null,
@@ -121,7 +114,8 @@ export function SupplyStoryChart({
   }, [data]);
 
   const last = data?.[data.length - 1];
-  const visibleTo = last ? addDays(last.periodStart, FORECAST_YEARS * 365) : to;
+  const visibleTo =
+    last && last.periodStart < VESTING_END_DATE ? VESTING_END_DATE : to;
 
   return (
     <Card>
@@ -143,8 +137,8 @@ export function SupplyStoryChart({
                 Forecast
               </span>
               : a dashed daily projection from the latest circulating close,
-              adding the remaining post-Singularity genesis unlock schedule
-              plus net mining at 80K QUAI/day.
+              adding only the remaining post-Singularity genesis unlock
+              schedule.
             </li>
           </ul>
           <p className="mt-2">
