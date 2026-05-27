@@ -203,6 +203,11 @@ export function EmissionsComparisonChart() {
 
       <ChartLegend items={EMISSIONS_COMPARISON_LEGEND} className="mt-3" />
 
+      <p className="mt-3 rounded-md border border-quai-500/20 bg-quai-500/[0.06] px-3 py-2 text-sm text-slate-900/75 dark:border-quai-400/20 dark:bg-quai-400/[0.06] dark:text-white/75">
+        Important note: QUAI approaches a terminal inflation rate roughly 10
+        years faster than Bitcoin on this age-aligned emissions curve.
+      </p>
+
       <div className="mt-3 h-72 sm:h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
