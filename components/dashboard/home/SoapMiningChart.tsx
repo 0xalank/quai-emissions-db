@@ -24,6 +24,10 @@ import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { ChartLegend, type ChartLegendItem } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 import {
+  TimeframeToggle,
+  type Timeframe,
+} from "@/components/dashboard/shared/TimeframeToggle";
+import {
   SOAP_ACTIVATION_DATE,
   applyLockupMultiplier,
   lockupDays,
@@ -36,6 +40,8 @@ import { cn } from "@/lib/utils";
 // cumulative curve right by the byte's lockup duration to draw the
 // unlocked-supply line.
 type LockupMode = "mined" | 0 | 1 | 2 | 3;
+
+const SOAP_WINDOW_OPTIONS: Timeframe[] = ["7d", "30d", "90d", "1y", "all"];
 
 const LOCKUP_LABELS: Record<Exclude<LockupMode, "mined">, string> = {
   0: "14 days",
@@ -52,6 +58,15 @@ const LOCKUP_BONUS_PCT: Record<Exclude<LockupMode, "mined">, string> = {
   2: "+10%",
   3: "+25%",
 };
+
+function timeframeFromToIso(timeframe: Timeframe, to: string): string {
+  if (timeframe === "all") return SOAP_ACTIVATION_DATE;
+  const days = { "7d": 7, "30d": 30, "90d": 90, "1y": 365 }[timeframe];
+  const d = new Date(to + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() - days);
+  const from = d.toISOString().slice(0, 10);
+  return from > SOAP_ACTIVATION_DATE ? from : SOAP_ACTIVATION_DATE;
+}
 
 // SoapMiningChart — cumulative QUAI mined and cumulative SOAP burn over the
 // visible window, zero-anchored at the first row so the gap between the two
@@ -82,16 +97,13 @@ const LOCKUP_BONUS_PCT: Record<Exclude<LockupMode, "mined">, string> = {
 //     an unbiased estimate of total workshare payout, not an over-count.
 
 export function SoapMiningChart({ to }: { to: string }) {
-  const from = useMemo(() => {
-    const d = new Date(to + "T00:00:00Z");
-    d.setUTCDate(d.getUTCDate() - 30);
-    const thirtyDaysAgo = d.toISOString().slice(0, 10);
-    return thirtyDaysAgo > SOAP_ACTIVATION_DATE
-      ? thirtyDaysAgo
-      : SOAP_ACTIVATION_DATE;
-  }, [to]);
-  const { data, isLoading, error } = useRollups({ period: "day", from, to });
+  const [timeframe, setTimeframe] = useState<Timeframe>("30d");
   const [mode, setMode] = useState<LockupMode>("mined");
+  const from = useMemo(
+    () => timeframeFromToIso(timeframe, to),
+    [timeframe, to],
+  );
+  const { data, isLoading, error } = useRollups({ period: "day", from, to });
 
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -242,6 +254,14 @@ export function SoapMiningChart({ to }: { to: string }) {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-[0.7rem] uppercase tracking-wider text-slate-900/55 dark:text-white/55">
+          Window
+        </span>
+        <TimeframeToggle
+          value={timeframe}
+          onChange={setTimeframe}
+          options={SOAP_WINDOW_OPTIONS}
+        />
         <span className="text-[0.7rem] uppercase tracking-wider text-slate-900/55 dark:text-white/55">
           Lockup scenario
         </span>
