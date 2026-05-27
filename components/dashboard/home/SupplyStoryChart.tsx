@@ -12,6 +12,7 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -22,24 +23,46 @@ import { InfoPopover } from "@/components/ui/InfoPopover";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { ChartLegend } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
-import {
-  QUAI_CAP_DATE,
-  quaiProjectedSupplyAt,
-} from "@/lib/comparisons/quai-projection";
+import { cumulativeUnlockedPostSingularity } from "@/lib/quai/genesis-schedule";
 
 const SUPPLY_STORY_LEGEND = [
   { label: "Circulating", color: "#e20101" },
   { label: "Forecast", color: "#14b8a6", dasharray: "5 4" },
 ];
 
+type SupplyStoryPoint = {
+  date: string;
+  realized: number | null;
+  forecast: number | null;
+};
+
 // SupplyStoryChart — the home-page flagship.
 //   • circulating (blue) — quai_total_end, what's actually circulating
 //                          (already net of SOAP burn at the RPC layer)
-//   • forecast (teal)    — linear projection from latest circulating to the
-//                          published 1.4B QUAI cap target by Feb 2029
+//   • forecast (teal)    — daily projection from latest circulating, adding
+//                          future post-Singularity genesis unlocks plus a
+//                          steady net mining assumption.
 //
 // The circulating line already has SOAP burn factored in at the RPC layer,
 // so this chart does not draw a separate burn overlay.
+
+const FORECAST_YEARS = 6;
+const MINING_PER_DAY_WEI = 800_000n * 10n ** 18n;
+const BURN_PER_DAY_WEI = (MINING_PER_DAY_WEI * 90n) / 100n;
+const NET_MINING_PER_DAY_WEI = MINING_PER_DAY_WEI - BURN_PER_DAY_WEI;
+const VESTING_END_DATE = "2029-01-08";
+
+function addDays(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function daysBetween(a: string, b: string): number {
+  const ms =
+    new Date(b + "T00:00:00Z").getTime() - new Date(a + "T00:00:00Z").getTime();
+  return Math.round(ms / 86_400_000);
+}
 
 export function SupplyStoryChart({
   from,
@@ -57,7 +80,7 @@ export function SupplyStoryChart({
 
   const chartData = useMemo(() => {
     if (!data) return [];
-    const history = data.map((r) => ({
+    const history: SupplyStoryPoint[] = data.map((r) => ({
       date: r.periodStart,
       realized: weiToFloat(r.realizedCirculatingQuai, 0),
       forecast: null as number | null,
@@ -65,43 +88,40 @@ export function SupplyStoryChart({
     const last = data[data.length - 1];
     if (!last) return history;
 
-    const anchor = {
-      date: new Date(last.periodStart + "T00:00:00Z"),
-      supply: last.realizedCirculatingQuai,
-    };
-    const forecast = [];
-    for (
-      let d = new Date(anchor.date);
-      d <= QUAI_CAP_DATE;
-      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
-    ) {
-      const iso = d.toISOString().slice(0, 10);
-      forecast.push({
-        date: iso,
-        realized: null as number | null,
-        forecast: weiToFloat(quaiProjectedSupplyAt(d, anchor), 0),
-      });
-    }
-    if (forecast[0]?.date === last.periodStart) {
-      forecast[0] = {
-        date: last.periodStart,
-        realized: weiToFloat(last.realizedCirculatingQuai, 0),
-        forecast: weiToFloat(last.realizedCirculatingQuai, 0),
-      };
-      return [...history.slice(0, -1), ...forecast];
-    }
-    return [
-      ...history,
+    const anchorDate = last.periodStart;
+    const scheduledAtAnchor = cumulativeUnlockedPostSingularity(anchorDate);
+    const horizonDate = addDays(anchorDate, FORECAST_YEARS * 365);
+    const totalDays = daysBetween(anchorDate, horizonDate);
+
+    const forecast: SupplyStoryPoint[] = [
       {
-        date: last.periodStart,
+        date: anchorDate,
         realized: weiToFloat(last.realizedCirculatingQuai, 0),
         forecast: weiToFloat(last.realizedCirculatingQuai, 0),
       },
-      ...forecast,
     ];
+    for (let dayOffset = 1; dayOffset <= totalDays; dayOffset += 1) {
+      const iso = addDays(anchorDate, dayOffset);
+      const scheduledAtDate = cumulativeUnlockedPostSingularity(iso);
+      const scheduledDelta =
+        scheduledAtDate > scheduledAtAnchor
+          ? scheduledAtDate - scheduledAtAnchor
+          : 0n;
+      const projected =
+        last.realizedCirculatingQuai +
+        scheduledDelta +
+        NET_MINING_PER_DAY_WEI * BigInt(dayOffset);
+      forecast.push({
+        date: iso,
+        realized: null as number | null,
+        forecast: weiToFloat(projected, 0),
+      });
+    }
+    return [...history.slice(0, -1), ...forecast];
   }, [data]);
 
   const last = data?.[data.length - 1];
+  const visibleTo = last ? addDays(last.periodStart, FORECAST_YEARS * 365) : to;
 
   return (
     <Card>
@@ -122,8 +142,9 @@ export function SupplyStoryChart({
               <span className="font-medium text-teal-600 dark:text-teal-300">
                 Forecast
               </span>
-              : a dashed projection from the latest circulating close to the
-              1.4B QUAI cap target on {QUAI_CAP_DATE.toISOString().slice(0, 10)}.
+              : a dashed daily projection from the latest circulating close,
+              adding the remaining post-Singularity genesis unlock schedule
+              plus net mining at 80K QUAI/day.
             </li>
           </ul>
           <p className="mt-2">
@@ -131,7 +152,9 @@ export function SupplyStoryChart({
             shown as an annotation only. The fork eliminated ~1.67 B QUAI of
             future genesis unlocks; those allocations were never minted into
             this curve, so there's nothing to subtract here. The effect lands
-            on eventual maximum supply, not on what's circulating today.
+            on eventual maximum supply, not on what's circulating today. The
+            forecast carries the remaining allowed unlocks forward through
+            {` ${VESTING_END_DATE}`}.
           </p>
         </InfoPopover>
       </div>
@@ -181,7 +204,21 @@ export function SupplyStoryChart({
                   />
                 }
               />
-              <ProtocolEventLines visibleFrom={from} visibleTo={to} />
+              <ProtocolEventLines visibleFrom={from} visibleTo={visibleTo} />
+              {last && VESTING_END_DATE <= visibleTo && (
+                <ReferenceLine
+                  x={VESTING_END_DATE}
+                  stroke="#a855f7"
+                  strokeDasharray="3 3"
+                  strokeOpacity={0.55}
+                  label={{
+                    value: "Genesis unlocks end",
+                    position: "insideTopRight",
+                    fill: "#a855f7",
+                    fontSize: 10,
+                  }}
+                />
+              )}
               <Area
                 type="monotone"
                 dataKey="realized"
@@ -196,7 +233,7 @@ export function SupplyStoryChart({
                 animationEasing="ease-out"
               />
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="forecast"
                 name="Forecast"
                 stroke="#14b8a6"
