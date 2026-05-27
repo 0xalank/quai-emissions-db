@@ -1,7 +1,6 @@
 "use client";
 import { useEffect } from "react";
 import { HomeHero } from "@/components/dashboard/home/HomeHero";
-import { SupplyStoryChart } from "@/components/dashboard/home/SupplyStoryChart";
 import { SupplyDecompositionChart } from "@/components/dashboard/home/SupplyDecompositionChart";
 import { SoapMiningChart } from "@/components/dashboard/home/SoapMiningChart";
 import { EmissionsComparisonChart } from "@/components/dashboard/home/EmissionsComparisonChart";
@@ -68,7 +67,6 @@ export default function DashboardHomePage() {
       </details>
 
       <div className="fade-in-stagger space-y-6">
-        <SupplyStoryChart from={flagshipFrom} to={flagshipTo} />
         <SupplyDecompositionChart from={flagshipFrom} to={flagshipTo} />
         <QiCumulativeChart from={flagshipFrom} to={flagshipTo} />
         <SoapMiningChart to={flagshipTo} />

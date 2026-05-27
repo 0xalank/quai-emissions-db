@@ -27,8 +27,8 @@ import { cn } from "@/lib/utils";
 import { cumulativeUnlockedPostSingularity } from "@/lib/quai/genesis-schedule";
 
 const DECOMPOSITION_LEGEND = [
-  { label: "Total Supply", color: "#a855f7" },
-  { label: "Mined", color: "#06b6d4", dasharray: "4 3" },
+  { label: "Total Supply", color: "#e20101" },
+  { label: "Circulating Mined Supply", color: "#06b6d4", dasharray: "4 3" },
 ];
 
 // Projection assumptions:
@@ -59,6 +59,10 @@ function daysBetween(a: string, b: string): number {
   return Math.round(ms / 86_400_000);
 }
 
+function capAtSupply(value: bigint, supply: bigint): bigint {
+  return value > supply ? supply : value;
+}
+
 export function SupplyDecompositionChart({
   from,
   to,
@@ -82,10 +86,11 @@ export function SupplyDecompositionChart({
 
     const historical = data.map((r) => {
       const grossMined = r.cumulativeMinedQuai ?? 0n;
+      const mined = capAtSupply(grossMined, r.quaiTotalEnd);
       return {
         date: r.periodStart,
         totalSupply: weiToFloat(r.quaiTotalEnd, 0),
-        mined: weiToFloat(grossMined, 0),
+        mined: weiToFloat(mined, 0),
       };
     });
 
@@ -136,11 +141,12 @@ export function SupplyDecompositionChart({
           : 0n;
       const genesisWei = anchorGenesis + scheduledDelta;
       const totalSupplyWei = genesisWei + grossMinedWei - burnWei;
+      const minedWei = capAtSupply(grossMinedWei, totalSupplyWei);
 
       projection.push({
         date,
         totalSupply: weiToFloat(totalSupplyWei, 0),
-        mined: weiToFloat(grossMinedWei, 0),
+        mined: weiToFloat(minedWei, 0),
       });
     }
 
@@ -182,7 +188,7 @@ export function SupplyDecompositionChart({
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
-        <CardTitle>QUAI supply decomposition</CardTitle>
+        <CardTitle>QUAI Supply</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -205,7 +211,7 @@ export function SupplyDecompositionChart({
             </p>
             <ul className="mt-2 list-disc pl-4 text-slate-900/70 dark:text-white/70">
               <li>
-                <span className="font-medium text-purple-600 dark:text-purple-300">
+                <span className="font-medium text-quai-600 dark:text-quai-400">
                   Total Supply
                 </span>{" "}
                 : <code>quaiTotalEnd</code>, the realized QUAI supply at each
@@ -213,9 +219,10 @@ export function SupplyDecompositionChart({
               </li>
               <li>
                 <span className="font-medium text-cyan-600 dark:text-cyan-300">
-                  Mined
+                  Circulating Mined Supply
                 </span>{" "}
-                : <code>cumulativeMinedQuai</code>, total mining issuance ever.
+                : <code>cumulativeMinedQuai</code>, capped to the current total
+                supply for display.
               </li>
             </ul>
             <p className="mt-2 font-medium">Forecast assumptions</p>
@@ -308,12 +315,12 @@ export function SupplyDecompositionChart({
               {vestingMarkerDate && (
                 <ReferenceLine
                   x={vestingMarkerDate}
-                  stroke="#a855f7"
+                  stroke="#e20101"
                   strokeDasharray="3 3"
                   label={{
                     value: "Vesting Complete",
                     position: "insideTop",
-                    fill: "#a855f7",
+                    fill: "#e20101",
                     fontSize: 11,
                     textAnchor: "start",
                     dx: 4,
@@ -324,8 +331,8 @@ export function SupplyDecompositionChart({
                 type="monotone"
                 dataKey="totalSupply"
                 name="Total Supply"
-                stroke="#a855f7"
-                fill="#a855f7"
+                stroke="#e20101"
+                fill="#e20101"
                 fillOpacity={0.45}
                 isAnimationActive
                 animationDuration={500}
@@ -334,7 +341,7 @@ export function SupplyDecompositionChart({
               <Area
                 type="monotone"
                 dataKey="mined"
-                name="Mined"
+                name="Circulating Mined Supply"
                 stroke="#06b6d4"
                 strokeWidth={1.4}
                 strokeDasharray="4 3"

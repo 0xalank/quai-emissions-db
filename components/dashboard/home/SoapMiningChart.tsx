@@ -53,10 +53,9 @@ const LOCKUP_BONUS_PCT: Record<Exclude<LockupMode, "mined">, string> = {
   3: "+25%",
 };
 
-// SoapMiningChart — cumulative QUAI mined and cumulative SOAP burn since
-// SOAP activation, both zero-anchored at the launch date so the gap
-// between the two lines is "net mining contribution to circulating since
-// SOAP."
+// SoapMiningChart — cumulative QUAI mined and cumulative SOAP burn over the
+// visible window, zero-anchored at the first row so the gap between the two
+// lines is "net mining contribution to circulating in this window."
 //
 // Why this needs its own chart: the supply-story chart on top uses
 // quai_total_end (RPC's quaiSupplyTotal), which mixes mining issuance with
@@ -68,22 +67,29 @@ const LOCKUP_BONUS_PCT: Record<Exclude<LockupMode, "mined">, string> = {
 //
 //   total_mining_wei = base_block_reward_sum + workshare_total × workshare_reward_avg
 //   quai_paid_wei    = total_mining_wei × (winner_quai_count / block_count)
-//   burn_since_soap  = burn_close[t] − burn_close[first row]
-//   net              = cumulative_mined − burn_since_soap
+//   burn_in_window   = burn_close[t] − burn_close[first row]
+//   net              = cumulative_mined − burn_in_window
 //
 // Notes:
 //   • Pre-SOAP rows are filtered out for mining (NULL columns).
 //   • Qi-winner blocks pay miners in Qi, not QUAI — so they don't add to
 //     the mined curve.
-//   • Burn anchor is the first row's burn_close in the response (the row
-//     covering SOAP activation day). Subsequent rows subtract that anchor
-//     to give cumulative-burn-since-SOAP.
+//   • Burn anchor is the first row's burn_close in the response. Subsequent
+//     rows subtract that anchor to give cumulative burn over the visible
+//     window.
 //   • Uncled workshares get redistributed within a block, not removed from
 //     the per-block reward — so workshare_total × workshare_reward_avg is
 //     an unbiased estimate of total workshare payout, not an over-count.
 
 export function SoapMiningChart({ to }: { to: string }) {
-  const from = SOAP_ACTIVATION_DATE;
+  const from = useMemo(() => {
+    const d = new Date(to + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() - 30);
+    const thirtyDaysAgo = d.toISOString().slice(0, 10);
+    return thirtyDaysAgo > SOAP_ACTIVATION_DATE
+      ? thirtyDaysAgo
+      : SOAP_ACTIVATION_DATE;
+  }, [to]);
   const { data, isLoading, error } = useRollups({ period: "day", from, to });
   const [mode, setMode] = useState<LockupMode>("mined");
 
@@ -102,7 +108,7 @@ export function SoapMiningChart({ to }: { to: string }) {
       burned: bigint;
     };
     const rows: Row[] = [
-      { date: SOAP_ACTIVATION_DATE, cumActual: 0n, cumSim: 0n, burned: 0n },
+      { date: from, cumActual: 0n, cumSim: 0n, burned: 0n },
     ];
     for (const r of data) {
       // Capture the burn anchor on the very first row regardless of mining
@@ -172,7 +178,7 @@ export function SoapMiningChart({ to }: { to: string }) {
         net: weiToFloat(netWei, 0),
       };
     });
-  }, [data, mode]);
+  }, [data, from, mode]);
 
   const last = chartData[chartData.length - 1];
   const showSimSeries = mode !== "mined";
@@ -211,10 +217,10 @@ export function SoapMiningChart({ to }: { to: string }) {
               <code>winner_quai_count / block_count</code>.
             </p>
             <p className="mt-2">
-              <span className="font-medium">Burned since SOAP</span>:{" "}
+              <span className="font-medium">Burned in window</span>:{" "}
               <code>burn_close[t] − burn_close[first row]</code>. The
-              anchor is the first SOAP-day rollup row, so the orange line
-              starts at zero and accumulates only burns post-activation.
+              anchor is the first visible rollup row, so the orange line
+              starts at zero and accumulates only burns in the selected window.
             </p>
             <p className="mt-2">
               <span className="font-medium">Lockup simulation</span>: the

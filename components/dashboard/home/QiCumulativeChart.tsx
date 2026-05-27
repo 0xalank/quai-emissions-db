@@ -22,13 +22,12 @@ import { ChartLegend } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 const QI_CUMULATIVE_LEGEND = [
-  { label: "Cumulative Qi minted", color: "#10b981" },
+  { label: "Qi supply", color: "#10b981" },
 ];
 
 // QiCumulativeChart — single-line cumulative Qi supply since Qi mining began.
 // Qi has no sinks (no burn, no Singularity skip), so the line is monotonically
-// non-decreasing. Companion to the SupplyStoryChart but without the wedges,
-// which would be misleading visual cruft for Qi.
+// non-decreasing. It avoids stacked wedges, which would be misleading for Qi.
 
 export function QiCumulativeChart({
   from,
@@ -56,7 +55,7 @@ export function QiCumulativeChart({
 
   return (
     <Card>
-      <CardTitle>Qi cumulative supply</CardTitle>
+      <CardTitle>Qi supply</CardTitle>
       <ChartLegend items={QI_CUMULATIVE_LEGEND} className="mt-3" />
 
       <div className="mt-3 h-56">
