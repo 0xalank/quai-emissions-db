@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { HomeHero } from "@/components/dashboard/home/HomeHero";
 import { SupplyDecompositionChart } from "@/components/dashboard/home/SupplyDecompositionChart";
+import { SupplyDistributionSnapshots } from "@/components/dashboard/home/SupplyDistributionSnapshots";
 import { SoapMiningChart } from "@/components/dashboard/home/SoapMiningChart";
 import { EmissionsComparisonChart } from "@/components/dashboard/home/EmissionsComparisonChart";
 import { QiCumulativeChart } from "@/components/dashboard/home/QiCumulativeChart";
@@ -70,6 +71,7 @@ export default function DashboardHomePage() {
         <SupplyDecompositionChart from={flagshipFrom} to={flagshipTo} />
         <QiCumulativeChart from={flagshipFrom} to={flagshipTo} />
         <SoapMiningChart to={flagshipTo} />
+        <SupplyDistributionSnapshots from={flagshipFrom} to={flagshipTo} />
         <EmissionsComparisonChart />
         <UpcomingUnlocks />
       </div>

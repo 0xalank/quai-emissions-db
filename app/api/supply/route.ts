@@ -32,6 +32,7 @@ import {
   SINGULARITY_SKIP_QUAI,
 } from "@/lib/quai/protocol-constants";
 import { apiServerError, parseRangeParams } from "@/lib/api-helpers";
+import { proxyToUpstreamApi } from "@/lib/api-proxy";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -66,6 +67,9 @@ type SupplyRow = {
 
 export async function GET(req: Request) {
   try {
+    const proxied = await proxyToUpstreamApi(req);
+    if (proxied) return proxied;
+
     const url = new URL(req.url);
     const parsed = parseRangeParams(url);
     if (parsed instanceof NextResponse) return parsed;

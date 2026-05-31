@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { serializeBig } from "@/lib/quai/serialize";
 import { apiServerError, parseRangeParams } from "@/lib/api-helpers";
+import { proxyToUpstreamApi } from "@/lib/api-proxy";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -115,6 +116,9 @@ function toRollup(r: RollupSqlRow) {
 
 export async function GET(req: Request) {
   try {
+    const proxied = await proxyToUpstreamApi(req);
+    if (proxied) return proxied;
+
     const url = new URL(req.url);
     const parsed = parseRangeParams(url);
     if (parsed instanceof NextResponse) return parsed;

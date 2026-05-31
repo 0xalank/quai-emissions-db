@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { getLatestBlockNumber } from "@/lib/quai/blocks";
 import { apiServerError } from "@/lib/api-helpers";
+import { proxyToUpstreamApi } from "@/lib/api-proxy";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -13,8 +14,11 @@ type CursorRow = {
   backfill_done: boolean;
 };
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const proxied = await proxyToUpstreamApi(req);
+    if (proxied) return proxied;
+
     const [cursorRes, head] = await Promise.all([
       pool.query<CursorRow>(
         `SELECT last_ingested_block::text, last_finalized_block::text,
