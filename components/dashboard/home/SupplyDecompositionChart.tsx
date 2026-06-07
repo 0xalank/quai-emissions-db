@@ -80,9 +80,15 @@ export function SupplyDecompositionChart({
   });
 
   const lastRow = data?.[data.length - 1];
+  const minedPending =
+    !!data &&
+    data.length > 0 &&
+    data.some(
+      (r) => r.minedExact !== true || r.cumulativeMinedQuai == null,
+    );
 
   const chartData = useMemo(() => {
-    if (!data) return [];
+    if (!data || minedPending) return [];
 
     const historical = data.map((r) => {
       const grossMined = r.cumulativeMinedQuai ?? 0n;
@@ -151,7 +157,7 @@ export function SupplyDecompositionChart({
     }
 
     return [...historical, ...projection];
-  }, [data, forecast, lastRow]);
+  }, [data, forecast, lastRow, minedPending]);
 
   const projectionRange = useMemo(() => {
     if (!forecast || !lastRow) return null;
@@ -258,7 +264,7 @@ export function SupplyDecompositionChart({
       <ChartLegend items={DECOMPOSITION_LEGEND} className="mt-3" />
 
       <div className="mt-3 h-72 sm:h-80">
-        {isLoading || !data ? (
+        {isLoading || !data || minedPending ? (
           <ChartSkeleton />
         ) : error ? (
           <div className="text-sm text-quai-600 dark:text-quai-400">{String(error)}</div>
@@ -356,7 +362,7 @@ export function SupplyDecompositionChart({
         )}
       </div>
 
-      {lastRow && (() => {
+      {lastRow && !minedPending && (() => {
         const grossMined = lastRow.cumulativeMinedQuai ?? 0n;
         const burnLast = lastRow.burnClose ?? 0n;
         const minedNet = grossMined > burnLast ? grossMined - burnLast : 0n;

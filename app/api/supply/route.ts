@@ -16,7 +16,8 @@
 //   { period, rows: [{
 //       periodStart, firstBlock, lastBlock, blockCount, partial,
 //       quaiTotalEnd, realizedCirculatingQuai,
-//       qiTotalEnd?, burnClose?, burnDelta?, genesisBaselineQuai?
+//       qiTotalEnd?, burnClose?, burnDelta?, genesisBaselineQuai?,
+//       cumulativeMinedQuai?, minedExact?
 //     }] }
 //
 // Caching mirrors /api/rollups (60s s-maxage / 300s SWR). Past periods are
@@ -64,6 +65,7 @@ type SupplyRow = {
   burn_delta: string;
   realized_circulating_quai: string;
   cumulative_mined: string | null;
+  mined_exact: boolean | null;
 };
 
 export async function GET(req: Request) {
@@ -90,28 +92,37 @@ export async function GET(req: Request) {
     const rollupTable = GRAIN_TO_ROLLUP[period];
 
     const sql = wantsMined
-      ? `WITH mined AS (
+      ? `WITH mined_base AS (
            SELECT
              period_start,
-             SUM(
-               CASE
-                 WHEN period_start < DATE '${SOAP_ACTIVATION_DATE}' THEN
-                   CASE
-                     WHEN block_count > 0 THEN
-                       FLOOR(
-                         COALESCE(base_block_reward_sum, 0)
-                         * winner_quai_count::numeric
-                         / block_count::numeric
-                       )
-                     ELSE 0::numeric
-                   END
-                 WHEN coinbase_reward_indexed_count >= block_count THEN
-                   COALESCE(coinbase_quai_locked_reward_sum, 0)
-                 ELSE 0::numeric
-               END
-             ) OVER (ORDER BY period_start) AS cumulative_mined
+             CASE
+               WHEN period_start < DATE '${SOAP_ACTIVATION_DATE}' THEN
+                 CASE
+                   WHEN block_count > 0 THEN
+                     FLOOR(
+                       COALESCE(base_block_reward_sum, 0)
+                       * winner_quai_count::numeric
+                       / block_count::numeric
+                     )
+                   ELSE 0::numeric
+                 END
+               WHEN coinbase_reward_indexed_count >= block_count THEN
+                 COALESCE(coinbase_quai_locked_reward_sum, 0)
+               ELSE 0::numeric
+             END AS period_mined,
+             CASE
+               WHEN period_start < DATE '${SOAP_ACTIVATION_DATE}' THEN true
+               ELSE coinbase_reward_indexed_count >= block_count
+             END AS period_mined_exact
            FROM ${rollupTable}
            WHERE period_start <= $2::date
+         ),
+         mined AS (
+           SELECT
+             period_start,
+             SUM(period_mined) OVER (ORDER BY period_start) AS cumulative_mined,
+             BOOL_AND(period_mined_exact) OVER (ORDER BY period_start) AS cumulative_mined_exact
+           FROM mined_base
          )
          SELECT
            to_char(v.period_start, 'YYYY-MM-DD') AS period_start,
@@ -120,7 +131,11 @@ export async function GET(req: Request) {
            v.qi_total_end::text,
            v.burn_close::text, v.burn_delta::text,
            v.realized_circulating_quai::text,
-           TRUNC(m.cumulative_mined)::text AS cumulative_mined
+           CASE
+             WHEN m.cumulative_mined_exact THEN TRUNC(m.cumulative_mined)::text
+             ELSE NULL::text
+           END AS cumulative_mined,
+           m.cumulative_mined_exact AS mined_exact
          FROM ${view} v
          JOIN mined m USING (period_start)
          WHERE v.period_start >= $1::date AND v.period_start <= $2::date
@@ -133,7 +148,8 @@ export async function GET(req: Request) {
            qi_total_end::text,
            burn_close::text, burn_delta::text,
            realized_circulating_quai::text,
-           NULL::text AS cumulative_mined
+           NULL::text AS cumulative_mined,
+           NULL::boolean AS mined_exact
          FROM ${view}
          WHERE period_start >= $1::date AND period_start <= $2::date
          ORDER BY period_start ASC
@@ -169,7 +185,12 @@ export async function GET(req: Request) {
           r.period_start >= SINGULARITY_FORK_DATE ? genesisPost : genesisPre;
       }
       if (include.has("mined") && r.cumulative_mined != null) {
-        out.cumulativeMinedQuai = BigInt(r.cumulative_mined);
+        out.minedExact = r.mined_exact === true;
+        if (r.mined_exact === true) {
+          out.cumulativeMinedQuai = BigInt(r.cumulative_mined);
+        }
+      } else if (include.has("mined")) {
+        out.minedExact = false;
       }
       return out;
     });

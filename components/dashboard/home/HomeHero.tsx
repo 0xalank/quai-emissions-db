@@ -54,6 +54,13 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
     }
     const latest = data[data.length - 1];
     const thirtyDayBaseline = data[0];
+    const latestMined = latest.cumulativeMinedQuai;
+    const baselineMined = thirtyDayBaseline.cumulativeMinedQuai;
+    const minedReady =
+      latest.minedExact === true &&
+      thirtyDayBaseline.minedExact === true &&
+      latestMined != null &&
+      baselineMined != null;
     const sevenBackIdx = Math.max(0, data.length - 1 - 7);
     const sevenDayBaseline = data[sevenBackIdx];
     const sevenDayDelta =
@@ -63,10 +70,8 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
       cumulativeUnlockedPostSingularity(latest.periodStart) -
       cumulativeUnlockedPostSingularity(thirtyDayBaseline.periodStart);
     const thirtyDayMined =
-      latest.cumulativeMinedQuai != null &&
-      thirtyDayBaseline.cumulativeMinedQuai != null
-        ? latest.cumulativeMinedQuai -
-          thirtyDayBaseline.cumulativeMinedQuai
+      minedReady
+        ? latestMined - baselineMined
         : null;
     // 30-day sparkline: the same window the hook fetched. Convert wei→float
     // once; MiniSparkline auto-scales y to data range.
@@ -229,7 +234,7 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
         </span>
       </span>
     ),
-    loading,
+    loading: loading || thirtyDayMined == null,
     accent: "purple",
   };
 

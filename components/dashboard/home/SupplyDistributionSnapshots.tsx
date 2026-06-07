@@ -105,9 +105,15 @@ export function SupplyDistributionSnapshots({
     to,
     include: ["mined"],
   });
+  const minedPending =
+    !!data &&
+    data.length > 0 &&
+    data.some(
+      (r) => r.minedExact !== true || r.cumulativeMinedQuai == null,
+    );
 
   const { snapshots, dailyMinedWei } = useMemo(() => {
-    if (!data || data.length === 0) {
+    if (!data || data.length === 0 || minedPending) {
       return { snapshots: [] as Snapshot[], dailyMinedWei: 0n };
     }
 
@@ -141,7 +147,7 @@ export function SupplyDistributionSnapshots({
       ],
       dailyMinedWei: dailyMined,
     };
-  }, [data]);
+  }, [data, minedPending]);
 
   return (
     <Card>
@@ -156,15 +162,19 @@ export function SupplyDistributionSnapshots({
       </div>
 
       <div className="mt-3 text-xs text-slate-900/55 dark:text-white/55">
-        <span>
-          Projection uses current mined rate:{" "}
-          <span className="font-mono text-slate-900/80 dark:text-white/80">
-            {formatCompact(weiToFloat(dailyMinedWei, 0))} QUAI/day
+        {minedPending ? (
+          <span>Indexing exact mined rewards…</span>
+        ) : (
+          <span>
+            Projection uses current mined rate:{" "}
+            <span className="font-mono text-slate-900/80 dark:text-white/80">
+              {formatCompact(weiToFloat(dailyMinedWei, 0))} QUAI/day
+            </span>
           </span>
-        </span>
+        )}
       </div>
       <div className="mt-4">
-        {isLoading || !data ? (
+        {isLoading || !data || minedPending ? (
           <div className="h-64">
             <ChartSkeleton />
           </div>
