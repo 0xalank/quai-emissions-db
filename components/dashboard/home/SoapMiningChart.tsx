@@ -80,6 +80,7 @@ function timeframeFromToIso(timeframe: Timeframe, to: string): string {
 //
 // Per-period math (rollup columns):
 //
+//   workshare_total   = ws_kawpow_sum + ws_progpow_sum + ws_sha_sum + ws_scrypt_sum
 //   rewardable_shares = block_count + workshare_total
 //   total_mining_wei  = rewardable_shares × workshare_reward_avg
 //   quai_paid_wei     = total_mining_wei × (winner_quai_count / block_count)
@@ -138,7 +139,8 @@ export function SoapMiningChart({ to }: { to: string }) {
         continue;
       }
       const wsReward = nz(r.workshareRewardAvg);
-      const wsTotal = BigInt(r.workshareTotal);
+      const wsTotal =
+        nz(r.wsKawpowSum) + nz(r.wsProgpowSum) + nz(r.wsShaSum) + nz(r.wsScryptSum);
       const shareTotal = BigInt(r.blockCount) + wsTotal;
       const baseTotalWei = wsReward * shareTotal;
 
@@ -222,7 +224,7 @@ export function SoapMiningChart({ to }: { to: string }) {
             <p>
               <span className="font-medium">Mined per period</span>:{" "}
               <code>
-                (block_count + workshare_total) × workshare_reward_avg
+                (block_count + ws_*_sum) × workshare_reward_avg
               </code>
               , because the block share and each included workshare receive a
               per-share reward. The result is gated to QUAI payout via{" "}

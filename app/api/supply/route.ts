@@ -113,7 +113,12 @@ export async function GET(req: Request) {
                        WHEN block_count > 0 THEN
                          FLOOR(
                            COALESCE(workshare_reward_avg, 0)
-                           * workshare_total::numeric
+                           * (
+                             COALESCE(ws_kawpow_sum, 0)
+                             + COALESCE(ws_progpow_sum, 0)
+                             + COALESCE(ws_sha_sum, 0)
+                             + COALESCE(ws_scrypt_sum, 0)
+                           )::numeric
                            * winner_quai_count::numeric
                            / block_count::numeric
                          )

@@ -16,6 +16,7 @@
     "reset:db": "tsx --env-file=.env.local scripts/reset-db.ts",
     "ingest": "tsx --env-file=.env.local scripts/ingest/run.ts",
     "backfill": "tsx --env-file=.env.local scripts/ingest/backfill.ts",
+    "backfill:workshares": "tsx --env-file=.env.local scripts/ingest/backfill-workshares.ts",
     "backfill:smoke": "tsx --env-file=.env.local scripts/ingest/backfill.ts --limit=1000",
     "rollup": "tsx --env-file=.env.local scripts/ingest/rollup.ts"
   },
