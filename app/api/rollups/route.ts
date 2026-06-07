@@ -60,6 +60,10 @@ type RollupSqlRow = {
   kawpow_difficulty_avg: string | null;
   sha_difficulty_avg: string | null;
   scrypt_difficulty_avg: string | null;
+  coinbase_quai_base_reward_sum: string;
+  coinbase_quai_locked_reward_sum: string;
+  coinbase_qi_reward_sum: string;
+  coinbase_reward_indexed_count: number;
   mining_block_count: number | null;
 };
 
@@ -110,6 +114,10 @@ function toRollup(r: RollupSqlRow) {
     kawpowDifficultyAvg: bn(r.kawpow_difficulty_avg),
     shaDifficultyAvg: bn(r.sha_difficulty_avg),
     scryptDifficultyAvg: bn(r.scrypt_difficulty_avg),
+    coinbaseQuaiBaseRewardSum: BigInt(r.coinbase_quai_base_reward_sum),
+    coinbaseQuaiLockedRewardSum: BigInt(r.coinbase_quai_locked_reward_sum),
+    coinbaseQiRewardSum: BigInt(r.coinbase_qi_reward_sum),
+    coinbaseRewardIndexedCount: r.coinbase_reward_indexed_count,
     miningBlockCount: r.mining_block_count,
   };
 }
@@ -146,6 +154,10 @@ export async function GET(req: Request) {
          workshare_reward_avg::text, avg_tx_fees_avg::text,
          kawpow_hashrate_avg::text, sha_hashrate_avg::text, scrypt_hashrate_avg::text,
          kawpow_difficulty_avg::text, sha_difficulty_avg::text, scrypt_difficulty_avg::text,
+         coinbase_quai_base_reward_sum::text,
+         coinbase_quai_locked_reward_sum::text,
+         coinbase_qi_reward_sum::text,
+         coinbase_reward_indexed_count,
          mining_block_count
        FROM ${table}
        WHERE period_start >= $1::date AND period_start <= $2::date

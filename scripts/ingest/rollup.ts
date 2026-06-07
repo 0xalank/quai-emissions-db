@@ -83,10 +83,14 @@ WITH base AS (
     mi.scrypt_hashrate,
     mi.avg_tx_fees,
     mi.workshare_reward,
+    cr.quai_base_reward,
+    cr.quai_locked_reward,
+    cr.qi_reward,
     ${bucket} AS period_start
   FROM blocks b
   JOIN supply_analytics sa ON sa.block_number = b.block_number
   LEFT JOIN mining_info mi ON mi.block_number = b.block_number
+  LEFT JOIN coinbase_rewards cr ON cr.block_number = b.block_number
   ${touchedFilter}
 ),
 aggs AS (
@@ -156,6 +160,12 @@ aggs AS (
     AVG(kawpow_difficulty)                           AS kawpow_difficulty_avg,
     AVG(sha_difficulty)                              AS sha_difficulty_avg,
     AVG(scrypt_difficulty)                           AS scrypt_difficulty_avg,
+    -- Exact reward-output sums. coinbase_reward_indexed_count equals the
+    -- number of blocks in the period covered by coinbase_rewards.
+    COALESCE(SUM(quai_base_reward), 0)               AS coinbase_quai_base_reward_sum,
+    COALESCE(SUM(quai_locked_reward), 0)             AS coinbase_quai_locked_reward_sum,
+    COALESCE(SUM(qi_reward), 0)                      AS coinbase_qi_reward_sum,
+    COUNT(quai_locked_reward)::int                   AS coinbase_reward_indexed_count,
     -- Count of blocks in the period that have a mining_info row; tells
     -- dashboards "how many samples were averaged" (and is zero for
     -- pre-SOAP periods).
@@ -228,6 +238,10 @@ joined AS (
     a.kawpow_difficulty_avg,
     a.sha_difficulty_avg,
     a.scrypt_difficulty_avg,
+    a.coinbase_quai_base_reward_sum,
+    a.coinbase_quai_locked_reward_sum,
+    a.coinbase_qi_reward_sum,
+    a.coinbase_reward_indexed_count,
     a.mining_block_count
   FROM aggs a
   JOIN firsts f USING (period_start)
@@ -250,6 +264,8 @@ INSERT INTO ${table} (
   workshare_reward_avg, avg_tx_fees_avg,
   kawpow_hashrate_avg, sha_hashrate_avg, scrypt_hashrate_avg,
   kawpow_difficulty_avg, sha_difficulty_avg, scrypt_difficulty_avg,
+  coinbase_quai_base_reward_sum, coinbase_quai_locked_reward_sum,
+  coinbase_qi_reward_sum, coinbase_reward_indexed_count,
   mining_block_count,
   computed_at
 )
@@ -271,6 +287,8 @@ SELECT
   workshare_reward_avg, avg_tx_fees_avg,
   kawpow_hashrate_avg, sha_hashrate_avg, scrypt_hashrate_avg,
   kawpow_difficulty_avg, sha_difficulty_avg, scrypt_difficulty_avg,
+  coinbase_quai_base_reward_sum, coinbase_quai_locked_reward_sum,
+  coinbase_qi_reward_sum, coinbase_reward_indexed_count,
   mining_block_count,
   now()
 FROM joined
@@ -317,6 +335,10 @@ ON CONFLICT (period_start) DO UPDATE SET
   kawpow_difficulty_avg = EXCLUDED.kawpow_difficulty_avg,
   sha_difficulty_avg    = EXCLUDED.sha_difficulty_avg,
   scrypt_difficulty_avg = EXCLUDED.scrypt_difficulty_avg,
+  coinbase_quai_base_reward_sum   = EXCLUDED.coinbase_quai_base_reward_sum,
+  coinbase_quai_locked_reward_sum = EXCLUDED.coinbase_quai_locked_reward_sum,
+  coinbase_qi_reward_sum          = EXCLUDED.coinbase_qi_reward_sum,
+  coinbase_reward_indexed_count   = EXCLUDED.coinbase_reward_indexed_count,
   mining_block_count    = EXCLUDED.mining_block_count,
   computed_at           = EXCLUDED.computed_at
 `;

@@ -314,6 +314,69 @@ export async function upsertMiningInfo(rows: MiningInfoRow[]): Promise<void> {
   }
 }
 
+// ── coinbase_rewards upsert ───────────────────────────────────────────────
+
+export type CoinbaseRewardRow = {
+  block_number: number;
+  quai_base_reward: bigint;
+  quai_locked_reward: bigint;
+  qi_reward: bigint;
+  coinbase_etx_count: number;
+  quai_coinbase_etx_count: number;
+  qi_coinbase_etx_count: number;
+};
+
+const COINBASE_REWARD_PARAMS_PER_ROW = 7;
+
+async function upsertCoinbaseRewardsChunk(
+  rows: CoinbaseRewardRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const values: unknown[] = [];
+  const placeholders: string[] = [];
+  let i = 1;
+  for (const r of rows) {
+    placeholders.push(
+      `($${i},$${i + 1},$${i + 2},$${i + 3},$${i + 4},$${i + 5},$${i + 6})`,
+    );
+    values.push(
+      r.block_number,
+      r.quai_base_reward.toString(),
+      r.quai_locked_reward.toString(),
+      r.qi_reward.toString(),
+      r.coinbase_etx_count,
+      r.quai_coinbase_etx_count,
+      r.qi_coinbase_etx_count,
+    );
+    i += COINBASE_REWARD_PARAMS_PER_ROW;
+  }
+
+  await pool.query(
+    `INSERT INTO coinbase_rewards
+       (block_number, quai_base_reward, quai_locked_reward, qi_reward,
+        coinbase_etx_count, quai_coinbase_etx_count, qi_coinbase_etx_count)
+     VALUES ${placeholders.join(",")}
+     ON CONFLICT (block_number) DO UPDATE SET
+       quai_base_reward        = EXCLUDED.quai_base_reward,
+       quai_locked_reward      = EXCLUDED.quai_locked_reward,
+       qi_reward               = EXCLUDED.qi_reward,
+       coinbase_etx_count      = EXCLUDED.coinbase_etx_count,
+       quai_coinbase_etx_count = EXCLUDED.quai_coinbase_etx_count,
+       qi_coinbase_etx_count   = EXCLUDED.qi_coinbase_etx_count,
+       indexed_at              = now()`,
+    values,
+  );
+}
+
+export async function upsertCoinbaseRewards(
+  rows: CoinbaseRewardRow[],
+): Promise<void> {
+  const max = maxRowsPerStmt(COINBASE_REWARD_PARAMS_PER_ROW);
+  for (let i = 0; i < rows.length; i += max) {
+    await upsertCoinbaseRewardsChunk(rows.slice(i, i + max));
+  }
+}
+
 export async function close(): Promise<void> {
   await pool.end();
 }

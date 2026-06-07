@@ -80,12 +80,12 @@ export async function GET(req: Request) {
 
     const view = GRAIN_TO_VIEW[period];
 
-    // Cumulative QUAI mining issuance summed up to the end of the requested
-    // window. Pre-SOAP, base_block_reward_sum is the block payout. Post-SOAP,
-    // go-quai emits one per-share reward for the winning block plus each
-    // included workshare; base_block_reward_sum is the reward pool, not an
-    // additional full block-producer payout. The CTE is bounded by `to` so the
-    // window function only scans rows the caller can actually see.
+    // Cumulative QUAI mining rewards summed up to the end of the requested
+    // window. Pre-SOAP keeps the legacy block-reward estimate. Post-SOAP uses
+    // the exact CoinbaseType outbound-ETX index, with lockup multipliers
+    // applied the same way go-quai applies them when the ETX is processed.
+    // The CTE is bounded by `to` so the window function only scans rows the
+    // caller can actually see.
     const wantsMined = include.has("mined");
     const rollupTable = GRAIN_TO_ROLLUP[period];
 
@@ -105,25 +105,9 @@ export async function GET(req: Request) {
                        )
                      ELSE 0::numeric
                    END
-                 WHEN workshare_reward_avg IS NULL THEN
-                   0::numeric
-                 ELSE
-                   COALESCE(workshare_reward_avg, 0) * winner_quai_count
-                   + CASE
-                       WHEN block_count > 0 THEN
-                         FLOOR(
-                           COALESCE(workshare_reward_avg, 0)
-                           * (
-                             COALESCE(ws_kawpow_sum, 0)
-                             + COALESCE(ws_progpow_sum, 0)
-                             + COALESCE(ws_sha_sum, 0)
-                             + COALESCE(ws_scrypt_sum, 0)
-                           )::numeric
-                           * winner_quai_count::numeric
-                           / block_count::numeric
-                         )
-                       ELSE 0::numeric
-                     END
+                 WHEN coinbase_reward_indexed_count >= block_count THEN
+                   COALESCE(coinbase_quai_locked_reward_sum, 0)
+                 ELSE 0::numeric
                END
              ) OVER (ORDER BY period_start) AS cumulative_mined
            FROM ${rollupTable}

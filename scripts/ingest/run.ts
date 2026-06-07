@@ -41,6 +41,7 @@ import {
   walkBlocksByNums,
   walkMiningInfo,
 } from "../../lib/quai/blocks";
+import { walkCoinbaseRewardsByNums } from "../../lib/quai/coinbase-rewards";
 import { walkSupplyAnalytics } from "../../lib/quai/supply";
 import { ZONE_RPC } from "../../lib/quai/constants";
 import { KAWPOW_FORK_BLOCK } from "../../lib/quai/rewards";
@@ -53,9 +54,11 @@ import {
   setCursor,
   upsertAnalytics,
   upsertBlocks,
+  upsertCoinbaseRewards,
   upsertMiningInfo,
   type AnalyticsRow,
   type BlockRow,
+  type CoinbaseRewardRow,
   type MiningInfoRow,
 } from "./db";
 import { runRollups } from "./rollup";
@@ -197,6 +200,7 @@ async function ingestRange(
   blocks: number;
   sampled: number;
   miningInfo: number;
+  coinbaseRewards: number;
   dbWriteMs: number;
 }> {
   const expected = to - from + 1;
@@ -213,12 +217,19 @@ async function ingestRange(
   // primeTerminusNumber, so almost every column gets populated here.
   // Sampled path: full blocks to count workshares[]; getMiningInfo for
   // server-computed hashrate/reward. Both post-SOAP only for mining_info.
-  const [headers, analyticsMap, burnMap, sampledBlocks] = await Promise.all([
-    walkHeaders(from, to),
-    walkSupplyAnalytics(from, to),
-    batchBurnBalances(blockNums),
-    walkBlocksByNums(sampledNums),
-  ]);
+  const coinbaseRewardsPromise: Promise<CoinbaseRewardRow[]> =
+    opts.sampleEvery <= 1
+      ? walkCoinbaseRewardsByNums(blockNums)
+      : Promise.resolve([]);
+
+  const [headers, analyticsMap, burnMap, sampledBlocks, coinbaseRewardRows] =
+    await Promise.all([
+      walkHeaders(from, to),
+      walkSupplyAnalytics(from, to),
+      batchBurnBalances(blockNums),
+      walkBlocksByNums(sampledNums),
+      coinbaseRewardsPromise,
+    ]);
 
   // --- Tier 1: strict coverage (dense path must cover every block) ---
   if (headers.length !== expected) {
@@ -237,6 +248,15 @@ async function ingestRange(
     if (!burnMap.has(b.number)) {
       throw new Error(`strict: missing burn balance for block ${b.number}`);
     }
+  }
+  if (opts.sampleEvery <= 1 && coinbaseRewardRows.length !== expected) {
+    const got = new Set(coinbaseRewardRows.map((r) => r.block_number));
+    const missing: number[] = [];
+    for (let n = from; n <= to; n++) if (!got.has(n)) missing.push(n);
+    throw new Error(
+      `strict: expected ${expected} coinbase reward rows in #${from}..#${to}, got ${coinbaseRewardRows.length}. ` +
+        `Missing ${missing.length}: [${missing.slice(0, 8).join(",")}${missing.length > 8 ? ",…" : ""}]`,
+    );
   }
 
   // --- Tier 3: continuity ---
@@ -307,12 +327,13 @@ async function ingestRange(
     });
   }
 
-  // Order: blocks first (FK target), then analytics + mining_info.
+  // Order: blocks first (FK target), then dependent tables.
   const dbWriteStart = Date.now();
   await upsertBlocks(blockRows);
   await Promise.all([
     upsertAnalytics(analyticsRows),
     upsertMiningInfo(miningInfoRows),
+    upsertCoinbaseRewards(coinbaseRewardRows),
   ]);
   const highest = mergedBlocks[mergedBlocks.length - 1].number;
   await setCursor(highest, Math.min(highest, opts.safeHead));
@@ -321,6 +342,7 @@ async function ingestRange(
     blocks: mergedBlocks.length,
     sampled: sampledBlocks.length,
     miningInfo: miningInfoRows.length,
+    coinbaseRewards: coinbaseRewardRows.length,
     dbWriteMs,
   };
 }
@@ -411,15 +433,17 @@ async function iterate(state: {
     const from = cursor.last_ingested_block + 1;
     const to = Math.min(safeHead, from + BACKFILL_CHUNK - 1);
     const chunkStart = Date.now();
-    const { blocks: n, sampled: s, miningInfo: mi, dbWriteMs } = await ingestRange(
-      from,
-      to,
-      {
-        safeHead,
-        cursorBefore: cursor.last_ingested_block,
-        sampleEvery: BACKFILL_SAMPLE_EVERY,
-      },
-    );
+    const {
+      blocks: n,
+      sampled: s,
+      miningInfo: mi,
+      coinbaseRewards: cr,
+      dbWriteMs,
+    } = await ingestRange(from, to, {
+      safeHead,
+      cursorBefore: cursor.last_ingested_block,
+      sampleEvery: BACKFILL_SAMPLE_EVERY,
+    });
     state.blocksWritten += n;
     state.backfillWroteBlocks ||= n > 0;
 
@@ -433,6 +457,7 @@ async function iterate(state: {
     const errorRate = state.errors / Math.max(state.iterations, 1);
     console.log(
       `[ingest] #${from}..#${to}  ${n} blocks  ${s} sampled  ${mi} mining_info  ` +
+        `${cr} coinbase_rewards  ` +
         `${chunkElapsed.toFixed(1)}s  ${(n / Math.max(chunkElapsed, 0.001)).toFixed(0)}/s  ` +
         `db=${dbWriteMs}ms lag=${remaining.toLocaleString()} blocks  ETA ${(eta / 60).toFixed(0)}m  ` +
         `avg=${(state.blocksWritten / lifetimeMinutes).toFixed(0)} blocks/min errors=${state.errors}/${state.iterations} (${(errorRate * 100).toFixed(1)}%)`,
@@ -467,7 +492,12 @@ async function iterate(state: {
       const from = prevCursor + 1;
       const to = head;
       const tailStart = Date.now();
-      const { blocks: n, miningInfo: mi, dbWriteMs } = await ingestRange(from, to, {
+      const {
+        blocks: n,
+        miningInfo: mi,
+        coinbaseRewards: cr,
+        dbWriteMs,
+      } = await ingestRange(from, to, {
         safeHead,
         cursorBefore: prevCursor,
         sampleEvery: 1, // tail mode: dense sample every block
@@ -480,7 +510,7 @@ async function iterate(state: {
         const lifetimeMinutes = Math.max((Date.now() - state.startedAt) / 60_000, 0.001);
         const errorRate = state.errors / Math.max(state.iterations, 1);
         console.log(
-          `[ingest] tail: #${from}..#${to} (${n} blocks, ${mi} mining_info), ` +
+          `[ingest] tail: #${from}..#${to} (${n} blocks, ${mi} mining_info, ${cr} coinbase_rewards), ` +
             `elapsed=${elapsed.toFixed(1)}s db=${dbWriteMs}ms lag=${lag} blocks ` +
             `avg=${(state.blocksWritten / lifetimeMinutes).toFixed(0)} blocks/min ` +
             `errors=${state.errors}/${state.iterations} (${(errorRate * 100).toFixed(1)}%), rollups updated`,

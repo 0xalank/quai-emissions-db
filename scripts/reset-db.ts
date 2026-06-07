@@ -19,6 +19,7 @@ const TABLES = [
   "rollups_daily",
   "rollups_weekly",
   "rollups_monthly",
+  "coinbase_rewards",
   "mining_info",
   "supply_analytics",
   "reorg_log",

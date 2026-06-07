@@ -186,6 +186,12 @@ export type Rollup = {
   kawpowDifficultyAvg: bigint | null;
   shaDifficultyAvg: bigint | null;
   scryptDifficultyAvg: bigint | null;
+  // Exact reward-output index (migrations/0009). Sums come from actual
+  // CoinbaseType outbound ETXs, not reward-parameter estimates.
+  coinbaseQuaiBaseRewardSum: bigint;     // raw QUAI wei before lockup multiplier
+  coinbaseQuaiLockedRewardSum: bigint;   // lockup-adjusted QUAI wei
+  coinbaseQiRewardSum: bigint;           // qits
+  coinbaseRewardIndexedCount: number;    // blocks in period with exact reward row
   miningBlockCount: number | null;  // post-SOAP blocks with mining_info row
 };
 
