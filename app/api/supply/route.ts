@@ -8,7 +8,7 @@
 //   period   day | week | month   (required)
 //   from     YYYY-MM-DD (required, UTC)
 //   to       YYYY-MM-DD (required, UTC)
-//   include  comma-separated subset of: qi, burn, genesis
+//   include  comma-separated subset of: qi, burn, genesis, mined
 //            (defaults to "qi,burn"; "genesis" adds the cumulative-genesis
 //             baseline as a separate column for the supply-decomposition page)
 //
@@ -30,6 +30,7 @@ import {
   GENESIS_PREMINE_QUAI,
   SINGULARITY_FORK_DATE,
   SINGULARITY_SKIP_QUAI,
+  SOAP_ACTIVATION_DATE,
 } from "@/lib/quai/protocol-constants";
 import { apiServerError, parseRangeParams } from "@/lib/api-helpers";
 import { proxyToUpstreamApi } from "@/lib/api-proxy";
@@ -79,11 +80,12 @@ export async function GET(req: Request) {
 
     const view = GRAIN_TO_VIEW[period];
 
-    // Cumulative mining issuance (block reward + workshare reward) summed
-    // up to the end of the requested window. The CTE is bounded by `to` so
-    // the window function only scans rows the caller can actually see —
-    // critical as the rollup tables grow. Without `WHERE period_start <= $2`,
-    // the window scan would fan out across the entire table on every request.
+    // Cumulative QUAI mining issuance summed up to the end of the requested
+    // window. Pre-SOAP, base_block_reward_sum is the block payout. Post-SOAP,
+    // go-quai emits one per-share reward for the winning block plus each
+    // included workshare; base_block_reward_sum is the reward pool, not an
+    // additional full block-producer payout. The CTE is bounded by `to` so the
+    // window function only scans rows the caller can actually see.
     const wantsMined = include.has("mined");
     const rollupTable = GRAIN_TO_ROLLUP[period];
 
@@ -92,8 +94,32 @@ export async function GET(req: Request) {
            SELECT
              period_start,
              SUM(
-               COALESCE(base_block_reward_sum, 0)
-               + COALESCE(workshare_reward_avg * workshare_total, 0)
+               CASE
+                 WHEN period_start < DATE '${SOAP_ACTIVATION_DATE}' THEN
+                   CASE
+                     WHEN block_count > 0 THEN
+                       FLOOR(
+                         COALESCE(base_block_reward_sum, 0)
+                         * winner_quai_count::numeric
+                         / block_count::numeric
+                       )
+                     ELSE 0::numeric
+                   END
+                 WHEN workshare_reward_avg IS NULL THEN
+                   0::numeric
+                 ELSE
+                   COALESCE(workshare_reward_avg, 0) * winner_quai_count
+                   + CASE
+                       WHEN block_count > 0 THEN
+                         FLOOR(
+                           COALESCE(workshare_reward_avg, 0)
+                           * workshare_total::numeric
+                           * winner_quai_count::numeric
+                           / block_count::numeric
+                         )
+                       ELSE 0::numeric
+                     END
+               END
              ) OVER (ORDER BY period_start) AS cumulative_mined
            FROM ${rollupTable}
            WHERE period_start <= $2::date
@@ -105,7 +131,7 @@ export async function GET(req: Request) {
            v.qi_total_end::text,
            v.burn_close::text, v.burn_delta::text,
            v.realized_circulating_quai::text,
-           m.cumulative_mined::text AS cumulative_mined
+           TRUNC(m.cumulative_mined)::text AS cumulative_mined
          FROM ${view} v
          JOIN mined m USING (period_start)
          WHERE v.period_start >= $1::date AND v.period_start <= $2::date

@@ -29,18 +29,19 @@ const QUAI_PER_ALGO_LEGEND = [
 // QuaiPerAlgoChart — daily QUAI emission attributed to each SOAP algorithm.
 //
 // Per period (post-SOAP rows only — pre-SOAP has NULL workshare_reward_avg):
-//   workshare_quai = workshare_reward_avg × ws_<algo>_sum
-//                    × (winner_quai_count / block_count)
+//   block_share_quai = workshare_reward_avg × winner_quai_count
+//   workshare_quai   = workshare_reward_avg × ws_<algo>_sum
+//                      × (winner_quai_count / block_count)
 //
-//   KawPoW = base_block_reward_sum × (winner_quai_count / block_count)
-//            + workshare_quai(kawpow)
+//   KawPoW = block_share_quai + workshare_quai(kawpow)
 //   SHA    = workshare_quai(sha)
 //   Scrypt = workshare_quai(scrypt)
 //
-// Block reward goes only to KawPoW (it seals every block). Workshare reward
-// is paid per workshare slot; we attribute by ws_<algo>_sum. The
-// (winner_quai_count / block_count) factor strips Qi-winner blocks (those
-// pay miners in Qi, not QUAI).
+// Post-SOAP, go-quai splits the reward pool into per-share rewards: one share
+// for the sealed block plus one for each included workshare. We attribute the
+// block share to KawPoW (it seals every block) and workshare rewards by
+// ws_<algo>_sum. The (winner_quai_count / block_count) factor strips Qi-winner
+// blocks (those pay miners in Qi, not QUAI).
 //
 // Caveat surfaced in InfoPopover: SHA/Scrypt uncled workshares get their
 // reward redistributed to internal-coinbase shares (which can be any algo).
@@ -61,7 +62,7 @@ export function QuaiPerAlgoChart({
     if (!data) return [];
     // Keep every row in the user's range so the X-axis matches the other
     // mining charts. Pre-SOAP rows naturally produce zeros (NULL ws_reward
-    // and NULL base_block_reward_sum coerce to 0n via nz), so the stacked
+    // coerces to 0n via nz), so the stacked
     // area sits flat until SOAP activation and ramps up — visually
     // telegraphing the cutover instead of clipping the timeline.
     return data.map((r) => {
@@ -70,7 +71,6 @@ export function QuaiPerAlgoChart({
         return { date: r.periodStart, kawpow: 0, sha: 0, scrypt: 0 };
       }
       const wsReward = nz(r.workshareRewardAvg);
-      const baseSum = nz(r.baseBlockRewardSum);
       const winnerQuai = BigInt(r.winnerQuaiCount);
 
       const wsKawpowQuai =
@@ -78,11 +78,11 @@ export function QuaiPerAlgoChart({
       const wsShaQuai = (wsReward * nz(r.wsShaSum) * winnerQuai) / blocks;
       const wsScryptQuai =
         (wsReward * nz(r.wsScryptSum) * winnerQuai) / blocks;
-      const blockRewardQuai = (baseSum * winnerQuai) / blocks;
+      const blockShareQuai = wsReward * winnerQuai;
 
       return {
         date: r.periodStart,
-        kawpow: weiToFloat(blockRewardQuai + wsKawpowQuai, 0),
+        kawpow: weiToFloat(blockShareQuai + wsKawpowQuai, 0),
         sha: weiToFloat(wsShaQuai, 0),
         scrypt: weiToFloat(wsScryptQuai, 0),
       };
@@ -104,9 +104,12 @@ export function QuaiPerAlgoChart({
                 <span className="font-medium text-quai-600 dark:text-quai-400">
                   KawPoW
                 </span>{" "}
-                = (<code>base_block_reward_sum</code> +{" "}
-                <code>workshare_reward_avg × ws_kawpow_sum</code>) ×{" "}
-                <code>winner_quai_count / block_count</code>
+                = <code>workshare_reward_avg</code> × (
+                <code>winner_quai_count</code> +{" "}
+                <code>
+                  ws_kawpow_sum × winner_quai_count / block_count
+                </code>
+                )
               </li>
               <li>
                 <span className="font-medium text-amber-600 dark:text-amber-300">

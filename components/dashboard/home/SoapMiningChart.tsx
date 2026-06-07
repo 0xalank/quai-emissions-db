@@ -80,21 +80,25 @@ function timeframeFromToIso(timeframe: Timeframe, to: string): string {
 //
 // Per-period math (rollup columns):
 //
-//   total_mining_wei = base_block_reward_sum + workshare_total × workshare_reward_avg
-//   quai_paid_wei    = total_mining_wei × (winner_quai_count / block_count)
+//   rewardable_shares = block_count + workshare_total
+//   total_mining_wei  = rewardable_shares × workshare_reward_avg
+//   quai_paid_wei     = total_mining_wei × (winner_quai_count / block_count)
 //   burn_in_window   = burn_close[t] − burn_close[first row]
 //   net              = cumulative_mined − burn_in_window
 //
 // Notes:
 //   • Pre-SOAP rows are filtered out for mining (NULL columns).
+//   • Post-SOAP, go-quai splits the block reward across the winning block share
+//     plus included workshares. `base_block_reward_sum` is the reward pool, not
+//     an additional full payout to the block producer.
 //   • Qi-winner blocks pay miners in Qi, not QUAI — so they don't add to
 //     the mined curve.
 //   • Burn anchor is the first row's burn_close in the response. Subsequent
 //     rows subtract that anchor to give cumulative burn over the visible
 //     window.
 //   • Uncled workshares get redistributed within a block, not removed from
-//     the per-block reward — so workshare_total × workshare_reward_avg is
-//     an unbiased estimate of total workshare payout, not an over-count.
+//     the per-share reward pool, so rewardable_shares × workshare_reward_avg
+//     remains the right network-level estimate when uncled sums are zero.
 
 export function SoapMiningChart({ to }: { to: string }) {
   const [timeframe, setTimeframe] = useState<Timeframe>("30d");
@@ -130,17 +134,13 @@ export function SoapMiningChart({ to }: { to: string }) {
       // Skip rows where the SOAP-era reward columns aren't populated. This
       // catches both pre-SOAP rows and any tail-mode rows where the rollup
       // hasn't yet picked up mining_info samples for the period.
-      if (
-        r.baseBlockRewardSum == null ||
-        r.workshareRewardAvg == null ||
-        r.blockCount === 0
-      ) {
+      if (r.workshareRewardAvg == null || r.blockCount === 0) {
         continue;
       }
-      const baseSum = nz(r.baseBlockRewardSum);
       const wsReward = nz(r.workshareRewardAvg);
       const wsTotal = BigInt(r.workshareTotal);
-      const baseTotalWei = baseSum + wsReward * wsTotal;
+      const shareTotal = BigInt(r.blockCount) + wsTotal;
+      const baseTotalWei = wsReward * shareTotal;
 
       // Sim total: apply multiplier when not in "mined" or byte-0 mode.
       // The multiplier depends on the zone block number; use the period's
@@ -222,10 +222,10 @@ export function SoapMiningChart({ to }: { to: string }) {
             <p>
               <span className="font-medium">Mined per period</span>:{" "}
               <code>
-                base_block_reward_sum + workshare_total ×
-                workshare_reward_avg
+                (block_count + workshare_total) × workshare_reward_avg
               </code>
-              , gated to QUAI payout via{" "}
+              , because the block share and each included workshare receive a
+              per-share reward. The result is gated to QUAI payout via{" "}
               <code>winner_quai_count / block_count</code>.
             </p>
             <p className="mt-2">
