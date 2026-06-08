@@ -11,6 +11,7 @@
 //   - supply_analytics: all columns (quai_added/removed/total, qi_added/removed/total,
 //     soap_burn_balance)
 //   - burn balance
+//   - coinbase_rewards: exact CoinbaseType outbound-ETX reward sums
 // Sampled (every BACKFILL_SAMPLE_EVERY-th block in backfill mode; every block in tail):
 //   - blocks: ws_kawpow_count, ws_progpow_count, ws_sha_count, ws_scrypt_count
 //     (requires full-block fetch to read the `workshares[]` array)
@@ -218,9 +219,7 @@ async function ingestRange(
   // Sampled path: full blocks to count workshares[]; getMiningInfo for
   // server-computed hashrate/reward. Both post-SOAP only for mining_info.
   const coinbaseRewardsPromise: Promise<CoinbaseRewardRow[]> =
-    opts.sampleEvery <= 1
-      ? walkCoinbaseRewardsByNums(blockNums)
-      : Promise.resolve([]);
+    walkCoinbaseRewardsByNums(blockNums);
 
   const [headers, analyticsMap, burnMap, sampledBlocks, coinbaseRewardRows] =
     await Promise.all([
@@ -249,7 +248,7 @@ async function ingestRange(
       throw new Error(`strict: missing burn balance for block ${b.number}`);
     }
   }
-  if (opts.sampleEvery <= 1 && coinbaseRewardRows.length !== expected) {
+  if (coinbaseRewardRows.length !== expected) {
     const got = new Set(coinbaseRewardRows.map((r) => r.block_number));
     const missing: number[] = [];
     for (let n = from; n <= to; n++) if (!got.has(n)) missing.push(n);
