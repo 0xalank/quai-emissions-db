@@ -57,8 +57,7 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
     const latestMined = latest.cumulativeMinedQuai;
     const baselineMined = thirtyDayBaseline.cumulativeMinedQuai;
     const minedReady =
-      latest.minedExact === true &&
-      thirtyDayBaseline.minedExact === true &&
+      latest.minedRangeExact === true &&
       latestMined != null &&
       baselineMined != null;
     const sevenBackIdx = Math.max(0, data.length - 1 - 7);

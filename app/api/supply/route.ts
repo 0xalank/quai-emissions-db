@@ -17,7 +17,7 @@
 //       periodStart, firstBlock, lastBlock, blockCount, partial,
 //       quaiTotalEnd, realizedCirculatingQuai,
 //       qiTotalEnd?, burnClose?, burnDelta?, genesisBaselineQuai?,
-//       cumulativeMinedQuai?, minedExact?
+//       cumulativeMinedQuai?, minedExact?, minedRangeExact?
 //     }] }
 //
 // Caching mirrors /api/rollups (60s s-maxage / 300s SWR). Past periods are
@@ -66,6 +66,7 @@ type SupplyRow = {
   realized_circulating_quai: string;
   cumulative_mined: string | null;
   mined_exact: boolean | null;
+  mined_range_exact: boolean | null;
 };
 
 export async function GET(req: Request) {
@@ -121,7 +122,13 @@ export async function GET(req: Request) {
            SELECT
              period_start,
              SUM(period_mined) OVER (ORDER BY period_start) AS cumulative_mined,
-             BOOL_AND(period_mined_exact) OVER (ORDER BY period_start) AS cumulative_mined_exact
+             BOOL_AND(period_mined_exact) OVER (ORDER BY period_start) AS cumulative_mined_exact,
+             BOOL_AND(
+               CASE
+                 WHEN period_start >= $1::date THEN period_mined_exact
+                 ELSE true
+               END
+             ) OVER (ORDER BY period_start) AS cumulative_mined_range_exact
            FROM mined_base
          )
          SELECT
@@ -131,11 +138,9 @@ export async function GET(req: Request) {
            v.qi_total_end::text,
            v.burn_close::text, v.burn_delta::text,
            v.realized_circulating_quai::text,
-           CASE
-             WHEN m.cumulative_mined_exact THEN TRUNC(m.cumulative_mined)::text
-             ELSE NULL::text
-           END AS cumulative_mined,
-           m.cumulative_mined_exact AS mined_exact
+           TRUNC(m.cumulative_mined)::text AS cumulative_mined,
+           m.cumulative_mined_exact AS mined_exact,
+           m.cumulative_mined_range_exact AS mined_range_exact
          FROM ${view} v
          JOIN mined m USING (period_start)
          WHERE v.period_start >= $1::date AND v.period_start <= $2::date
@@ -149,7 +154,8 @@ export async function GET(req: Request) {
            burn_close::text, burn_delta::text,
            realized_circulating_quai::text,
            NULL::text AS cumulative_mined,
-           NULL::boolean AS mined_exact
+           NULL::boolean AS mined_exact,
+           NULL::boolean AS mined_range_exact
          FROM ${view}
          WHERE period_start >= $1::date AND period_start <= $2::date
          ORDER BY period_start ASC
@@ -186,11 +192,11 @@ export async function GET(req: Request) {
       }
       if (include.has("mined") && r.cumulative_mined != null) {
         out.minedExact = r.mined_exact === true;
-        if (r.mined_exact === true) {
-          out.cumulativeMinedQuai = BigInt(r.cumulative_mined);
-        }
+        out.minedRangeExact = r.mined_range_exact === true;
+        out.cumulativeMinedQuai = BigInt(r.cumulative_mined);
       } else if (include.has("mined")) {
         out.minedExact = false;
+        out.minedRangeExact = false;
       }
       return out;
     });

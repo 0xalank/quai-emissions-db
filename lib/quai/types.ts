@@ -223,6 +223,7 @@ export type SupplyRow = {
   burnDelta?: bigint;
   genesisBaselineQuai?: bigint;
   minedExact?: boolean;
+  minedRangeExact?: boolean;
   cumulativeMinedQuai?: bigint;
 };
 

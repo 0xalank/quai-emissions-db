@@ -108,9 +108,7 @@ export function SupplyDistributionSnapshots({
   const minedPending =
     !!data &&
     data.length > 0 &&
-    data.some(
-      (r) => r.minedExact !== true || r.cumulativeMinedQuai == null,
-    );
+    data.at(-1)?.minedExact !== true;
 
   const { snapshots, dailyMinedWei } = useMemo(() => {
     if (!data || data.length === 0 || minedPending) {

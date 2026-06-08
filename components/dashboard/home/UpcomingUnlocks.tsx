@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { useSupply } from "@/lib/hooks";
+import { useHeadBlock, useRollups, useSupply } from "@/lib/hooks";
 import { formatCompact, formatPeriodDate, weiToFloat } from "@/lib/format";
 import {
   dateOfScheduleMonth,
@@ -26,6 +26,21 @@ function formatUnlockPct(amount: bigint, circulatingSupply: bigint | null): stri
   return `${whole}.${frac}%`;
 }
 
+function estimateUnlockDate(
+  targetBlock: bigint,
+  headBlock: number | null,
+  avgBlockTime: number | null,
+): string {
+  if (headBlock == null || avgBlockTime == null || avgBlockTime <= 0) {
+    const month = Number(targetBlock / BLOCKS_PER_MONTH);
+    return dateOfScheduleMonth(month);
+  }
+  const remainingBlocks = targetBlock - BigInt(headBlock);
+  if (remainingBlocks <= 0n) return new Date().toISOString().slice(0, 10);
+  const msFromNow = Number(remainingBlocks) * avgBlockTime * 1000;
+  return new Date(Date.now() + msFromNow).toISOString().slice(0, 10);
+}
+
 export function UpcomingUnlocks() {
   const today = new Date().toISOString().slice(0, 10);
   const supplyFrom = useMemo(() => {
@@ -39,19 +54,43 @@ export function UpcomingUnlocks() {
     to: today,
     include: [],
   });
+  const { data: head } = useHeadBlock();
+  const { data: recentRollups } = useRollups({
+    period: "day",
+    from: supplyFrom,
+    to: today,
+  });
   const circulatingSupply = latestSupply?.at(-1)?.realizedCirculatingQuai ?? null;
+  const avgBlockTime = useMemo(() => {
+    if (!recentRollups || recentRollups.length === 0) return null;
+    let weighted = 0;
+    let blocks = 0;
+    for (const r of recentRollups) {
+      weighted += r.avgBlockTime * r.blockCount;
+      blocks += r.blockCount;
+    }
+    return blocks > 0 ? weighted / blocks : null;
+  }, [recentRollups]);
 
   const rows = useMemo<UnlockRow[]>(() => {
     return POST_SINGULARITY_UNLOCK_SCHEDULE.map(
       ([month, amount]) => ({
         blockNumber: BigInt(month) * BLOCKS_PER_MONTH,
-        date: dateOfScheduleMonth(month),
+        date: estimateUnlockDate(
+          BigInt(month) * BLOCKS_PER_MONTH,
+          head?.headBlock ?? null,
+          avgBlockTime,
+        ),
         amount,
       }),
     )
-      .filter((row) => row.date >= today && row.amount > 0n)
+      .filter((row) =>
+        head?.headBlock != null
+          ? row.blockNumber > BigInt(head.headBlock) && row.amount > 0n
+          : row.date >= today && row.amount > 0n,
+      )
       .slice(0, UPCOMING_UNLOCK_COUNT);
-  }, []);
+  }, [avgBlockTime, head?.headBlock, today]);
 
   return (
     <Card>

@@ -30,6 +30,7 @@ const DECOMPOSITION_LEGEND = [
   { label: "Total Supply", color: "#e20101" },
   { label: "Circulating Mined Supply", color: "#06b6d4", dasharray: "4 3" },
 ];
+const TOTAL_SUPPLY_LEGEND = [{ label: "Total Supply", color: "#e20101" }];
 
 // Projection assumptions:
 //   • Mining: 800 000 QUAI / day, flat. Reasonable steady-state estimate;
@@ -88,7 +89,7 @@ export function SupplyDecompositionChart({
     );
 
   const chartData = useMemo(() => {
-    if (!data || minedPending) return [];
+    if (!data) return [];
 
     const historical = data.map((r) => {
       const grossMined = r.cumulativeMinedQuai ?? 0n;
@@ -96,11 +97,11 @@ export function SupplyDecompositionChart({
       return {
         date: r.periodStart,
         totalSupply: weiToFloat(r.quaiTotalEnd, 0),
-        mined: weiToFloat(mined, 0),
+        mined: minedPending ? undefined : weiToFloat(mined, 0),
       };
     });
 
-    if (!forecast || !lastRow) return historical;
+    if (!forecast || !lastRow || minedPending) return historical;
 
     const anchorDate = lastRow.periodStart;
     const anchorMined = lastRow.cumulativeMinedQuai ?? 0n;
@@ -160,12 +161,12 @@ export function SupplyDecompositionChart({
   }, [data, forecast, lastRow, minedPending]);
 
   const projectionRange = useMemo(() => {
-    if (!forecast || !lastRow) return null;
+    if (!forecast || !lastRow || minedPending) return null;
     return {
       from: lastRow.periodStart,
       to: addDays(lastRow.periodStart, PROJECTION_YEARS * 365),
     };
-  }, [forecast, lastRow]);
+  }, [forecast, lastRow, minedPending]);
 
   // Single pass over chartData (~2,700 rows when forecast is on) computes
   // two independent things:
@@ -261,10 +262,13 @@ export function SupplyDecompositionChart({
         </div>
       </div>
 
-      <ChartLegend items={DECOMPOSITION_LEGEND} className="mt-3" />
+      <ChartLegend
+        items={minedPending ? TOTAL_SUPPLY_LEGEND : DECOMPOSITION_LEGEND}
+        className="mt-3"
+      />
 
       <div className="mt-3 h-72 sm:h-80">
-        {isLoading || !data || minedPending ? (
+        {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
           <div className="text-sm text-quai-600 dark:text-quai-400">{String(error)}</div>
@@ -344,23 +348,33 @@ export function SupplyDecompositionChart({
                 animationDuration={500}
                 animationEasing="ease-out"
               />
-              <Area
-                type="monotone"
-                dataKey="mined"
-                name="Circulating Mined Supply"
-                stroke="#06b6d4"
-                strokeWidth={1.4}
-                strokeDasharray="4 3"
-                fill="#06b6d4"
-                fillOpacity={0.18}
-                isAnimationActive
-                animationDuration={500}
-                animationEasing="ease-out"
-              />
+              {!minedPending && (
+                <Area
+                  type="monotone"
+                  dataKey="mined"
+                  name="Circulating Mined Supply"
+                  stroke="#06b6d4"
+                  strokeWidth={1.4}
+                  strokeDasharray="4 3"
+                  fill="#06b6d4"
+                  fillOpacity={0.18}
+                  isAnimationActive
+                  animationDuration={500}
+                  animationEasing="ease-out"
+                />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         )}
       </div>
+
+      {lastRow && minedPending && (
+        <div className="mt-2 text-xs text-slate-900/50 dark:text-white/50">
+          Exact mined rewards are still indexing for older history; total
+          supply is live, and the mined overlay will appear when the full
+          cumulative reward path is indexed.
+        </div>
+      )}
 
       {lastRow && !minedPending && (() => {
         const grossMined = lastRow.cumulativeMinedQuai ?? 0n;
