@@ -114,7 +114,7 @@ export default function FaqPage() {
   }, []);
 
   return (
-    <main className="mx-auto max-w-[1200px] px-4 py-6 md:px-8 md:py-10">
+    <main className="mx-auto max-w-[1200px] px-3 py-4 sm:px-4 sm:py-6 md:px-8 md:py-10">
       <div className="mb-6">
         <p className="eyebrow">Reference</p>
         <h1 className="display-heading mt-2 text-3xl text-slate-900 dark:text-white md:text-5xl">

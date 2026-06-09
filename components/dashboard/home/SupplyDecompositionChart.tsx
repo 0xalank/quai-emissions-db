@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { useSupply } from "@/lib/hooks";
+import { useCompactViewport, useSupply } from "@/lib/hooks";
 import {
   formatCompact,
   formatPeriodDate,
@@ -72,6 +72,7 @@ export function SupplyDecompositionChart({
   to: string;
 }) {
   const [forecast, setForecast] = useState(false);
+  const compact = useCompactViewport();
 
   const { data, isLoading, error } = useSupply({
     period: "day",
@@ -194,9 +195,9 @@ export function SupplyDecompositionChart({
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
+      <div className="chart-card-header">
         <CardTitle>QUAI Supply</CardTitle>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="chart-card-actions">
           <button
             type="button"
             onClick={() => setForecast((v) => !v)}
@@ -267,7 +268,7 @@ export function SupplyDecompositionChart({
         className="mt-3"
       />
 
-      <div className="mt-3 h-72 sm:h-80">
+      <div className="chart-shell">
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
@@ -291,14 +292,14 @@ export function SupplyDecompositionChart({
                 tickLine={false}
                 axisLine={false}
                 ticks={xAxisTicks}
-                interval={0}
+                interval={compact ? "preserveStartEnd" : 0}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatCompact}
                 tickLine={false}
                 axisLine={false}
-                width={64}
+                width={compact ? 48 : 64}
               />
               <Tooltip
                 content={

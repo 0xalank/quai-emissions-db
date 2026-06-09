@@ -19,7 +19,7 @@ export function TopCoinbasesTable({
 
   return (
     <Card>
-      <div className="flex items-end justify-between gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
         <div>
           <CardTitle>Top coinbases · {days}d</CardTitle>
           <p className="mt-1 text-xs text-slate-900/80 dark:text-white/80">

@@ -32,18 +32,18 @@ export default function DashboardHomePage() {
   }, []);
 
   return (
-    <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8 md:py-10">
-      <div className="mb-5">
+    <main className="mx-auto max-w-[1400px] px-3 py-4 sm:px-4 sm:py-6 md:px-8 md:py-10">
+      <div className="mb-4 sm:mb-5">
         <HomeHero from={HERO_FROM} to={todayIso()} />
       </div>
 
-      <details className="group mb-6 overflow-hidden rounded-lg border border-amber-400/50 border-l-4 border-l-amber-400 bg-amber-50/50 dark:border-amber-500/40 dark:border-l-amber-500 dark:bg-amber-500/[0.04]">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-          <div className="flex items-baseline gap-3">
+      <details className="group mb-4 overflow-hidden rounded-lg border border-amber-400/50 border-l-4 border-l-amber-400 bg-amber-50/50 dark:border-amber-500/40 dark:border-l-amber-500 dark:bg-amber-500/[0.04] sm:mb-6">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-3 py-3 sm:px-4 [&::-webkit-details-marker]:hidden">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
             <span className="text-sm font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
               Recent Catalysts
             </span>
-            <span className="text-xs text-slate-900/60 dark:text-white/60">
+            <span className="text-xs leading-5 text-slate-900/60 dark:text-white/60">
               Two protocol changes reshaping QUAI's emissions and eventual
               supply.
             </span>
@@ -61,13 +61,13 @@ export default function DashboardHomePage() {
             />
           </svg>
         </summary>
-        <div className="grid grid-cols-1 gap-4 px-4 pb-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 px-3 pb-3 sm:px-4 sm:pb-4 lg:grid-cols-2">
           <SoapCallout />
           <SingularityCallout />
         </div>
       </details>
 
-      <div className="fade-in-stagger space-y-6">
+      <div className="fade-in-stagger space-y-4 sm:space-y-6">
         <SupplyDecompositionChart from={flagshipFrom} to={flagshipTo} />
         <QiCumulativeChart from={flagshipFrom} to={flagshipTo} />
         <SoapMiningChart to={flagshipTo} />

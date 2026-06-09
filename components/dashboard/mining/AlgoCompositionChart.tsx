@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { useRollups } from "@/lib/hooks";
+import { useCompactViewport, useRollups } from "@/lib/hooks";
 import { formatPeriodDate } from "@/lib/format";
 import { nz } from "@/lib/quai/types";
 import {
@@ -39,6 +39,7 @@ export function AlgoCompositionChart({
   to: string;
 }) {
   const { data, isLoading, error } = useRollups({ period: "day", from, to });
+  const compact = useCompactViewport();
 
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -63,14 +64,14 @@ export function AlgoCompositionChart({
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
+      <div className="chart-card-header">
         <CardTitle>Workshare share by algorithm</CardTitle>
         <SamplingFootnote kind="extrapolated" />
       </div>
 
       <ChartLegend items={ALGO_COMPOSITION_LEGEND} className="mt-3" />
 
-      <div className="mt-3 h-72 sm:h-80">
+      <div className="chart-shell">
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
@@ -93,7 +94,7 @@ export function AlgoCompositionChart({
                 tickFormatter={formatPeriodDate}
                 tickLine={false}
                 axisLine={false}
-                minTickGap={48}
+                minTickGap={compact ? 72 : 48}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
@@ -101,7 +102,7 @@ export function AlgoCompositionChart({
                 domain={[0, 100]}
                 tickLine={false}
                 axisLine={false}
-                width={48}
+                width={compact ? 40 : 48}
               />
               <Tooltip
                 content={

@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { useRollups } from "@/lib/hooks";
+import { useCompactViewport, useRollups } from "@/lib/hooks";
 import {
   formatCompact,
   formatPeriodDate,
@@ -42,6 +42,7 @@ function timeframeFromToIso(timeframe: Timeframe, to: string): string {
 // SOAP burn over the visible window, zero-anchored at the first rollup row.
 export function SoapMiningChart({ to }: { to: string }) {
   const [timeframe, setTimeframe] = useState<Timeframe>("30d");
+  const compact = useCompactViewport();
   const from = useMemo(
     () => timeframeFromToIso(timeframe, to),
     [timeframe, to],
@@ -93,7 +94,7 @@ export function SoapMiningChart({ to }: { to: string }) {
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
+      <div className="chart-card-header">
         <CardTitle>QUAI mining vs SOAP burn since SOAP</CardTitle>
         <InfoPopover label="About SOAP mining vs burn">
           <p>
@@ -128,7 +129,7 @@ export function SoapMiningChart({ to }: { to: string }) {
 
       <ChartLegend items={legendItems} className="mt-3" />
 
-      <div className="mt-3 h-72 sm:h-80">
+      <div className="chart-shell">
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
@@ -157,14 +158,14 @@ export function SoapMiningChart({ to }: { to: string }) {
                 tickFormatter={formatPeriodDate}
                 tickLine={false}
                 axisLine={false}
-                minTickGap={48}
+                minTickGap={compact ? 72 : 48}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatCompact}
                 tickLine={false}
                 axisLine={false}
-                width={64}
+                width={compact ? 48 : 64}
               />
               <Tooltip
                 content={

@@ -112,9 +112,9 @@ export function HeroStrip({
   return (
     <div
       className={cn(
-        "grid gap-3",
-        // Mobile: stack. md: dominant 2×1, supporting fill remaining cells.
-        "grid-cols-1 md:grid-cols-4",
+        "grid grid-cols-2 gap-3 md:grid-cols-4",
+        // Mobile: dominant spans the row, supporting cards use a compact
+        // two-column grid. md: dominant 2×1, supporting fill remaining cells.
         // lg+: bento with dominant 2×2.
         lgTemplate,
         className,
@@ -134,7 +134,7 @@ function DominantCard({ card }: { card: HeroCard }) {
   return (
     <div
       className={cn(
-        "card md:col-span-2 lg:col-span-2 lg:row-span-2 relative overflow-hidden border-l-4",
+        "card relative col-span-2 overflow-hidden border-l-4 md:col-span-2 lg:col-span-2 lg:row-span-2",
         "flex flex-col",
         ACCENT_BORDER[accent],
       )}
@@ -147,14 +147,14 @@ function DominantCard({ card }: { card: HeroCard }) {
       >
         {card.label}
       </div>
-      <div className="mt-1 flex items-baseline gap-3">
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         {card.loading ? (
           <div className="h-9 w-44 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
         ) : (
           <AnimatedValue
             value={card.value}
             numericValue={card.numericValue}
-            className="tabular text-3xl font-semibold tracking-tight text-slate-900 dark:text-white"
+            className="tabular text-[1.75rem] font-semibold leading-tight tracking-tight text-slate-900 dark:text-white sm:text-3xl"
           />
         )}
         {card.delta && <DeltaTag delta={card.delta} />}
@@ -183,7 +183,7 @@ function SupportingCard({ card }: { card: HeroCard }) {
   return (
     <div
       className={cn(
-        "card",
+        "card min-w-0",
         accent && "border-l-4",
         accent && ACCENT_BORDER[accent],
       )}
@@ -198,20 +198,20 @@ function SupportingCard({ card }: { card: HeroCard }) {
       >
         {card.label}
       </div>
-      <div className="mt-1 flex items-baseline gap-2">
+      <div className="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
         {card.loading ? (
           <div className="h-6 w-24 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
         ) : (
           <AnimatedValue
             value={card.value}
             numericValue={card.numericValue}
-            className="tabular text-xl font-medium tracking-tight text-slate-900 dark:text-white"
+            className="tabular min-w-0 text-lg font-medium leading-tight tracking-tight text-slate-900 dark:text-white sm:text-xl"
           />
         )}
         {card.delta && <DeltaTag delta={card.delta} compact />}
       </div>
       {card.sub && (
-        <div className="mt-1 text-xs text-slate-900/50 dark:text-white/50">
+        <div className="mt-1 hidden text-xs text-slate-900/50 dark:text-white/50 sm:block">
           {card.sub}
         </div>
       )}

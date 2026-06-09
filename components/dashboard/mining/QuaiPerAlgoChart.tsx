@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { useRollups } from "@/lib/hooks";
+import { useCompactViewport, useRollups } from "@/lib/hooks";
 import { formatCompact, formatPeriodDate, weiToFloat } from "@/lib/format";
 import { nz } from "@/lib/quai/types";
 import {
@@ -57,6 +57,7 @@ export function QuaiPerAlgoChart({
   to: string;
 }) {
   const { data, isLoading, error } = useRollups({ period: "day", from, to });
+  const compact = useCompactViewport();
 
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -91,9 +92,9 @@ export function QuaiPerAlgoChart({
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
+      <div className="chart-card-header">
         <CardTitle>QUAI rewarded per algorithm</CardTitle>
-        <div className="flex items-center gap-1">
+        <div className="chart-card-actions">
           <SamplingFootnote kind="extrapolated" />
           <InfoPopover label="About QUAI per algorithm">
             <p>
@@ -137,7 +138,7 @@ export function QuaiPerAlgoChart({
 
       <ChartLegend items={QUAI_PER_ALGO_LEGEND} className="mt-3" />
 
-      <div className="mt-3 h-72 sm:h-80">
+      <div className="chart-shell">
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
@@ -160,14 +161,14 @@ export function QuaiPerAlgoChart({
                 tickFormatter={formatPeriodDate}
                 tickLine={false}
                 axisLine={false}
-                minTickGap={48}
+                minTickGap={compact ? 72 : 48}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatCompact}
                 tickLine={false}
                 axisLine={false}
-                width={64}
+                width={compact ? 48 : 64}
               />
               <Tooltip
                 content={

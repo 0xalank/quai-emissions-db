@@ -61,8 +61,9 @@ export function InfoPopover({
           role="dialog"
           aria-label={label}
           className={cn(
-            "absolute top-7 z-20 w-72 rounded-xl border p-3 text-xs leading-relaxed shadow-xl",
-            align === "right" ? "right-0" : "left-0",
+            "fixed inset-x-3 bottom-3 z-20 max-h-[70vh] overflow-y-auto rounded-lg border p-3 text-xs leading-relaxed shadow-xl",
+            "sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-7 sm:w-72",
+            align === "right" ? "sm:right-0" : "sm:left-0",
           )}
           style={{
             background: "var(--popover-bg)",

@@ -18,25 +18,36 @@ export function TopNav() {
         borderColor: "var(--nav-border)",
       }}
     >
-      <div className="mx-auto flex h-[52px] max-w-[1400px] items-center justify-between gap-4 px-4 md:px-8">
-        <div className="flex min-w-0 items-center gap-3">
-          <Link
-            href="/"
-            className="flex shrink-0 items-center gap-2 font-display text-sm font-semibold uppercase tracking-[0.02em]"
-          >
-            <QuaiMark />
-            <span className="text-quai-500">Quai</span>
-            <span className="text-slate-900 dark:text-white/90">
-              Supply Tracker
-            </span>
-          </Link>
-          <span
-            aria-hidden
-            className="hidden h-5 w-px shrink-0 bg-slate-900/10 dark:bg-ink-50/10 sm:inline-block"
-          />
+      <div className="mx-auto flex min-h-[52px] max-w-[1400px] flex-col items-stretch gap-2 px-3 py-2 sm:h-[52px] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4 sm:py-0 md:px-8">
+        <div className="flex min-w-0 items-center justify-between gap-3 sm:justify-start">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link
+              href="/"
+              className="flex shrink-0 items-center gap-2 font-display text-sm font-semibold uppercase tracking-[0.02em]"
+            >
+              <QuaiMark />
+              <span className="text-quai-500">Quai</span>
+              <span className="hidden text-slate-900 dark:text-white/90 sm:inline">
+                Supply Tracker
+              </span>
+            </Link>
+            <span
+              aria-hidden
+              className="hidden h-5 w-px shrink-0 bg-slate-900/10 dark:bg-ink-50/10 sm:inline-block"
+            />
+            <div className="hidden min-w-0 sm:block">
+              <DashboardSubNav />
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 sm:hidden">
+            <StatusCluster />
+            <ThemeToggle />
+          </div>
+        </div>
+        <div className="sm:hidden">
           <DashboardSubNav />
         </div>
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="hidden shrink-0 items-center gap-3 sm:flex">
           <StatusCluster />
           <ThemeToggle />
         </div>

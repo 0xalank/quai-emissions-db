@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { useRollups } from "@/lib/hooks";
+import { useCompactViewport, useRollups } from "@/lib/hooks";
 import {
   formatCompact,
   formatPeriodDate,
@@ -33,6 +33,7 @@ const BLOCK_REWARD_LEGEND = [
 
 export function BlockRewardChart({ from, to }: { from: string; to: string }) {
   const { data, isLoading, error } = useRollups({ period: "day", from, to });
+  const compact = useCompactViewport();
 
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -45,14 +46,14 @@ export function BlockRewardChart({ from, to }: { from: string; to: string }) {
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
+      <div className="chart-card-header">
         <CardTitle>Block reward</CardTitle>
         <SamplingFootnote kind="averaged" />
       </div>
 
       <ChartLegend items={BLOCK_REWARD_LEGEND} className="mt-2" />
 
-      <div className="mt-3 h-56">
+      <div className="chart-shell-short">
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
@@ -73,14 +74,14 @@ export function BlockRewardChart({ from, to }: { from: string; to: string }) {
                 tickFormatter={formatPeriodDate}
                 tickLine={false}
                 axisLine={false}
-                minTickGap={32}
+                minTickGap={compact ? 64 : 32}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatCompact}
                 tickLine={false}
                 axisLine={false}
-                width={64}
+                width={compact ? 48 : 64}
               />
               <Tooltip
                 content={

@@ -204,7 +204,7 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
     id: "issuance-sources-30d",
     label: "Mined + genesis · 30d",
     value: (
-      <span className="grid w-full grid-cols-2 gap-3">
+      <span className="grid w-full grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-3">
         <span>
           <span className="block text-[0.65rem] font-normal uppercase tracking-wider text-slate-900/50 dark:text-white/45">
             Mined

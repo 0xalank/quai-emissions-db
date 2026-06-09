@@ -34,7 +34,7 @@ export function TimeframeToggle({
       role="tablist"
       aria-label="Timeframe"
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-md border p-0.5",
+        "inline-flex max-w-full items-center gap-0.5 overflow-x-auto whitespace-nowrap rounded-md border p-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         "border-slate-900/10 dark:border-white/10",
         className,
       )}
@@ -49,7 +49,7 @@ export function TimeframeToggle({
             aria-selected={active}
             onClick={() => onChange(opt)}
             className={cn(
-              "rounded px-2 py-0.5 text-xs transition",
+              "shrink-0 rounded px-2 py-1 text-xs transition sm:py-0.5",
               active
                 ? "bg-slate-900/10 text-slate-900 dark:bg-white/15 dark:text-white"
                 : "text-slate-700 hover:text-slate-900 dark:text-white/60 dark:hover:text-white/90",

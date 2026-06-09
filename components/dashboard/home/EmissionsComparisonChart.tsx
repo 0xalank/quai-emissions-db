@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { useSupply } from "@/lib/hooks";
+import { useCompactViewport, useSupply } from "@/lib/hooks";
 import {
   CartesianGrid,
   Line,
@@ -63,6 +63,7 @@ function yearsBetween(later: Date, earlier: Date): number {
 }
 
 export function EmissionsComparisonChart() {
+  const compact = useCompactViewport();
   // Pull Quai realized supply from the last 14 days; we just need a fresh
   // anchor — a single row works. `today` was previously computed inline on
   // every render, which made `useSupply`'s query key (and downstream
@@ -169,7 +170,7 @@ export function EmissionsComparisonChart() {
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
+      <div className="chart-card-header">
         <CardTitle>QUAI vs Bitcoin emission curves</CardTitle>
         <InfoPopover label="About the comparison">
           <p>
@@ -208,7 +209,7 @@ export function EmissionsComparisonChart() {
         years faster than Bitcoin on this age-aligned emissions curve.
       </p>
 
-      <div className="mt-3 h-72 sm:h-80">
+      <div className="chart-shell">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
@@ -225,7 +226,11 @@ export function EmissionsComparisonChart() {
               domain={[0, CHART_YEARS]}
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={(v) => `Y${Math.round(Number(v))}`}
-              ticks={[0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40]}
+              ticks={
+                compact
+                  ? [0, 8, 16, 24, 32, 40]
+                  : [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40]
+              }
               tickLine={false}
               axisLine={false}
               minTickGap={32}
@@ -236,7 +241,7 @@ export function EmissionsComparisonChart() {
               domain={[0, 105]}
               tickLine={false}
               axisLine={false}
-              width={48}
+              width={compact ? 40 : 48}
             />
             <Tooltip
               content={

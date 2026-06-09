@@ -55,7 +55,7 @@ export function ChartTooltip({
 
   return (
     <div
-      className="min-w-[180px] rounded-md border p-2.5 shadow-md"
+      className="max-w-[calc(100vw-2rem)] min-w-[160px] rounded-md border p-2.5 shadow-md sm:min-w-[180px]"
       style={{
         background: "var(--chart-tooltip-bg)",
         color: "var(--chart-tooltip-text)",
@@ -84,7 +84,7 @@ export function ChartTooltip({
           return (
             <div
               key={`${name}-${idx}`}
-              className="flex items-center gap-2 text-xs"
+              className="flex min-w-0 items-center gap-2 text-xs"
             >
               <span
                 aria-hidden

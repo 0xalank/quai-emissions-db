@@ -28,19 +28,19 @@ export default function MiningPage() {
   }, []);
 
   return (
-    <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8 md:py-10">
-      <div className="mb-5">
+    <main className="mx-auto max-w-[1400px] px-3 py-4 sm:px-4 sm:py-6 md:px-8 md:py-10">
+      <div className="mb-4 sm:mb-5">
         <MiningHero from={flagshipFrom} to={flagshipTo} />
       </div>
 
-      <div className="mb-3 flex items-center justify-end gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-start gap-2 sm:justify-end">
         <span className="text-[0.7rem] uppercase tracking-wider text-slate-900/55 dark:text-white/55">
           Range
         </span>
         <TimeframeToggle value={tf} onChange={setTf} />
       </div>
 
-      <div className="fade-in-stagger space-y-6">
+      <div className="fade-in-stagger space-y-4 sm:space-y-6">
         <AlgoCompositionChart from={flagshipFrom} to={flagshipTo} />
         <QuaiPerAlgoChart from={flagshipFrom} to={flagshipTo} />
 

@@ -101,40 +101,75 @@ export function UpcomingUnlocks() {
           No future genesis unlocks remain in the post-Singularity schedule.
         </div>
       ) : (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
-            <thead className="border-b border-slate-200/70 text-xs uppercase tracking-wider text-slate-900/50 dark:border-white/10 dark:text-white/45">
-              <tr>
-                <th className="py-2 pr-4 font-medium">Estimated date</th>
-                <th className="py-2 pr-4 font-medium">Block</th>
-                <th className="py-2 pr-4 text-right font-medium">Unlock</th>
-                <th className="py-2 text-right font-medium">
-                  Unlock % of circulating
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200/60 dark:divide-white/10">
-              {rows.map((row) => {
-                return (
-                  <tr key={row.blockNumber.toString()}>
-                    <td className="py-2.5 pr-4 font-medium text-slate-900 dark:text-white">
+        <>
+          <div className="mt-3 space-y-2 sm:hidden">
+            {rows.map((row) => (
+              <div
+                key={row.blockNumber.toString()}
+                className="rounded-md border border-slate-200/70 p-3 dark:border-white/10"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-slate-900 dark:text-white">
                       {formatPeriodDate(row.date)}
-                    </td>
-                    <td className="py-2.5 pr-4 font-mono text-xs text-slate-900/55 dark:text-white/55">
+                    </div>
+                    <div className="mt-1 font-mono text-xs text-slate-900/55 dark:text-white/55">
                       #{row.blockNumber.toLocaleString()}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right font-mono text-slate-900/75 dark:text-white/75">
-                      {formatCompact(weiToFloat(row.amount, 0))} QUAI
-                    </td>
-                    <td className="py-2.5 text-right font-mono text-slate-900/75 dark:text-white/75">
-                      {formatUnlockPct(row.amount, circulatingSupply)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right font-mono text-sm text-slate-900/80 dark:text-white/80">
+                    {formatCompact(weiToFloat(row.amount, 0))}
+                    <span className="ml-1 text-xs text-slate-900/50 dark:text-white/50">
+                      QUAI
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-200/60 pt-2 text-xs dark:border-white/10">
+                  <span className="text-slate-900/50 dark:text-white/50">
+                    Unlock % of circulating
+                  </span>
+                  <span className="font-mono text-slate-900/75 dark:text-white/75">
+                    {formatUnlockPct(row.amount, circulatingSupply)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 hidden overflow-x-auto sm:block">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="border-b border-slate-200/70 text-xs uppercase tracking-wider text-slate-900/50 dark:border-white/10 dark:text-white/45">
+                <tr>
+                  <th className="py-2 pr-4 font-medium">Estimated date</th>
+                  <th className="py-2 pr-4 font-medium">Block</th>
+                  <th className="py-2 pr-4 text-right font-medium">Unlock</th>
+                  <th className="py-2 text-right font-medium">
+                    Unlock % of circulating
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200/60 dark:divide-white/10">
+                {rows.map((row) => {
+                  return (
+                    <tr key={row.blockNumber.toString()}>
+                      <td className="py-2.5 pr-4 font-medium text-slate-900 dark:text-white">
+                        {formatPeriodDate(row.date)}
+                      </td>
+                      <td className="py-2.5 pr-4 font-mono text-xs text-slate-900/55 dark:text-white/55">
+                        #{row.blockNumber.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right font-mono text-slate-900/75 dark:text-white/75">
+                        {formatCompact(weiToFloat(row.amount, 0))} QUAI
+                      </td>
+                      <td className="py-2.5 text-right font-mono text-slate-900/75 dark:text-white/75">
+                        {formatUnlockPct(row.amount, circulatingSupply)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </Card>
   );

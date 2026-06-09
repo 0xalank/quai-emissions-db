@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { reviveBig } from "@/lib/quai/serialize";
 import type {
@@ -11,6 +12,20 @@ import type {
   SupplyRow,
 } from "@/lib/quai/types";
 import { STATS_REFRESH_MS } from "@/lib/quai/constants";
+
+export function useCompactViewport(query = "(max-width: 639px)") {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, [query]);
+
+  return matches;
+}
 
 export type StatsPayload = {
   supply: SupplyInfo;
@@ -190,4 +205,3 @@ export function useSupply(args: {
     placeholderData: keepPreviousData,
   });
 }
-

@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { useSupply } from "@/lib/hooks";
+import { useCompactViewport, useSupply } from "@/lib/hooks";
 import {
   formatCompact,
   formatPeriodDate,
@@ -42,6 +42,7 @@ export function QiCumulativeChart({
     to,
     include: ["qi"],
   });
+  const compact = useCompactViewport();
 
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -58,7 +59,7 @@ export function QiCumulativeChart({
       <CardTitle>Qi supply</CardTitle>
       <ChartLegend items={QI_CUMULATIVE_LEGEND} className="mt-3" />
 
-      <div className="mt-3 h-56">
+      <div className="chart-shell-short">
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
@@ -81,14 +82,14 @@ export function QiCumulativeChart({
                 tickFormatter={formatPeriodDate}
                 tickLine={false}
                 axisLine={false}
-                minTickGap={48}
+                minTickGap={compact ? 72 : 48}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatCompact}
                 tickLine={false}
                 axisLine={false}
-                width={64}
+                width={compact ? 48 : 64}
               />
               <Tooltip
                 content={

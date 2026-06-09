@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { useRollups } from "@/lib/hooks";
+import { useCompactViewport, useRollups } from "@/lib/hooks";
 import { formatHashrate, formatPeriodDate } from "@/lib/format";
 import {
   CartesianGrid,
@@ -35,6 +35,7 @@ const ALGOS: ReadonlyArray<{ key: Algo; label: string; color: string }> = [
 
 export function HashrateChart({ from, to }: { from: string; to: string }) {
   const [algo, setAlgo] = useState<Algo>("kawpow");
+  const compact = useCompactViewport();
   const { data, isLoading, error } = useRollups({ period: "day", from, to });
 
   const chartData = useMemo(() => {
@@ -52,7 +53,7 @@ export function HashrateChart({ from, to }: { from: string; to: string }) {
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
+      <div className="chart-card-header">
         <CardTitle>Per-algorithm hashrate</CardTitle>
         <SamplingFootnote kind="averaged" />
       </div>
@@ -91,7 +92,7 @@ export function HashrateChart({ from, to }: { from: string; to: string }) {
 
       <ChartLegend items={legend} className="mt-2" />
 
-      <div className="mt-3 h-56">
+      <div className="chart-shell-short">
         {isLoading || !data ? (
           <ChartSkeleton />
         ) : error ? (
@@ -114,14 +115,14 @@ export function HashrateChart({ from, to }: { from: string; to: string }) {
                 tickFormatter={formatPeriodDate}
                 tickLine={false}
                 axisLine={false}
-                minTickGap={32}
+                minTickGap={compact ? 64 : 32}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={(v) => formatHashrate(BigInt(Math.floor(Number(v))))}
                 tickLine={false}
                 axisLine={false}
-                width={80}
+                width={compact ? 56 : 80}
                 domain={[0, "auto"]}
               />
               <Tooltip

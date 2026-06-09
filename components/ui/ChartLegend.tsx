@@ -23,11 +23,11 @@ export function ChartLegend({
 }) {
   if (!items.length) return null;
   return (
-    <div className={cn("flex flex-wrap gap-1.5", className)}>
+    <div className={cn("flex flex-wrap gap-1 sm:gap-1.5", className)}>
       {items.map((item) => (
         <span
           key={item.label}
-          className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/[0.04] px-2 py-0.5 text-xs text-slate-700 dark:bg-white/[0.06] dark:text-white/70"
+          className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/[0.04] px-1.5 py-0.5 text-[0.68rem] text-slate-700 dark:bg-white/[0.06] dark:text-white/70 sm:px-2 sm:text-xs"
         >
           {item.dasharray ? (
             <svg

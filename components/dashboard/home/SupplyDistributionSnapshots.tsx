@@ -149,7 +149,7 @@ export function SupplyDistributionSnapshots({
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
+      <div className="chart-card-header">
         <div>
           <CardTitle>QUAI emission distribution</CardTitle>
           <p className="mt-1 text-sm text-slate-900/60 dark:text-white/60">

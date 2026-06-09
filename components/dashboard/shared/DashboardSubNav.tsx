@@ -46,7 +46,10 @@ export function DashboardSubNav() {
   }, [pathname]);
 
   return (
-    <div ref={containerRef} className="relative flex items-center gap-1">
+    <div
+      ref={containerRef}
+      className="relative flex max-w-full items-center gap-1 overflow-x-auto whitespace-nowrap pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
+    >
       {TABS.map((t) => {
         const active = isActive(pathname, t);
         return (
@@ -58,7 +61,7 @@ export function DashboardSubNav() {
               else tabRefsRef.current.delete(t.href);
             }}
             className={cn(
-              "shrink-0 rounded-md px-3 py-1 text-sm transition",
+              "shrink-0 rounded-md px-2.5 py-1.5 text-sm transition sm:px-3 sm:py-1",
               active
                 ? "bg-slate-900/10 text-slate-900 dark:bg-white/10 dark:text-white"
                 : "text-slate-700 hover:text-slate-900 dark:text-white/60 dark:hover:text-white/90",
