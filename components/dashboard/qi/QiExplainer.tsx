@@ -22,7 +22,7 @@ export function QiExplainer() {
       <div className="chart-card-header">
         <div>
           <CardTitle>What is Qi?</CardTitle>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-800 dark:text-white/75">
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-950 dark:text-white">
             Qi is Quai Network&apos;s energy-linked medium-of-exchange token:
             a UTXO asset designed for everyday payments, cash-like privacy, and
             supply that responds through miner emissions and protocol
@@ -55,7 +55,7 @@ export function QiExplainer() {
             href={link.href}
             target="_blank"
             rel="noreferrer"
-            className="rounded-md border border-slate-900/10 px-2.5 py-1 text-xs text-slate-700 transition hover:border-slate-900/20 hover:text-slate-950 dark:border-white/10 dark:text-white/65 dark:hover:border-white/20 dark:hover:text-white"
+            className="rounded-md border border-slate-900/10 px-2.5 py-1 text-xs text-slate-950 transition hover:border-slate-900/20 dark:border-white/10 dark:text-white dark:hover:border-white/20"
           >
             {link.label}
           </a>
@@ -71,7 +71,7 @@ function ExplainerPoint({ title, body }: { title: string; body: string }) {
       <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
         {title}
       </div>
-      <p className="mt-2 text-sm leading-6 text-slate-800 dark:text-white/72">
+      <p className="mt-2 text-sm leading-6 text-slate-950 dark:text-white">
         {body}
       </p>
     </div>

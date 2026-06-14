@@ -1,5 +1,5 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { ChartLegend } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
@@ -29,6 +29,19 @@ const LEGEND = [
   { label: "QUAI close", color: QUAI_PRICE_COLOR },
 ];
 
+type PriceScale = "log" | "linear";
+
+function priceDomain(values: Array<number | null>): [number, number] {
+  const positive = values.filter(
+    (v): v is number => v != null && Number.isFinite(v) && v > 0,
+  );
+  if (positive.length === 0) return [0.001, 1];
+  const min = Math.min(...positive);
+  const max = Math.max(...positive);
+  if (min === max) return [min * 0.75, max * 1.25];
+  return [min * 0.9, max * 1.1];
+}
+
 export function QiImpliedPriceChart({
   from,
   to,
@@ -36,6 +49,7 @@ export function QiImpliedPriceChart({
   from: string;
   to: string;
 }) {
+  const [scale, setScale] = useState<PriceScale>("log");
   const compact = useCompactViewport();
   const { data, isLoading, error } = useQiMarket({ from, to });
 
@@ -50,21 +64,56 @@ export function QiImpliedPriceChart({
   }, [data]);
 
   const hasPrice = chartData.some((r) => r.qiPrice != null);
+  const qiDomain = useMemo(
+    () => priceDomain(chartData.map((r) => r.qiPrice)),
+    [chartData],
+  );
+  const quaiDomain = useMemo(
+    () => priceDomain(chartData.map((r) => r.quaiPrice)),
+    [chartData],
+  );
 
   return (
     <Card>
       <div className="chart-card-header">
         <CardTitle>Implied Qi price</CardTitle>
-        <InfoPopover label="About implied Qi price">
-          <p>
-            Implied Qi price is calculated as daily QUAI/USDT close multiplied
-            by the stored chain quote for QUAI per Qi.
-          </p>
-          <p className="mt-2">
-            QUAI candles come from MEXC. Days without a candle still keep the
-            chain quote, but cannot produce an implied price.
-          </p>
-        </InfoPopover>
+        <div className="chart-card-actions">
+          <div
+            role="tablist"
+            aria-label="Price scale"
+            className="inline-flex items-center gap-0.5 rounded-md border border-slate-900/10 p-0.5 dark:border-white/10"
+          >
+            {(["log", "linear"] as const).map((opt) => {
+              const active = scale === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setScale(opt)}
+                  className={
+                    active
+                      ? "rounded px-2 py-0.5 text-xs transition bg-slate-900/10 text-slate-900 dark:bg-white/15 dark:text-white"
+                      : "rounded px-2 py-0.5 text-xs transition text-slate-700 hover:text-slate-900 dark:text-white/60 dark:hover:text-white/90"
+                  }
+                >
+                  {opt === "log" ? "Log" : "Linear"}
+                </button>
+              );
+            })}
+          </div>
+          <InfoPopover label="About implied Qi price">
+            <p>
+              Implied Qi price is calculated as daily QUAI/USDT close multiplied
+              by the stored chain quote for QUAI per Qi.
+            </p>
+            <p className="mt-2">
+              QUAI candles come from MEXC. Days without a candle still keep the
+              chain quote, but cannot produce an implied price.
+            </p>
+          </InfoPopover>
+        </div>
       </div>
 
       <ChartLegend items={LEGEND} className="mt-3" />
@@ -103,7 +152,9 @@ export function QiImpliedPriceChart({
                 tickLine={false}
                 axisLine={false}
                 width={compact ? 54 : 68}
-                domain={["auto", "auto"]}
+                scale={scale}
+                domain={scale === "log" ? qiDomain : ["auto", "auto"]}
+                tickCount={compact ? 4 : 5}
               />
               <YAxis
                 yAxisId="quai"
@@ -113,7 +164,9 @@ export function QiImpliedPriceChart({
                 tickLine={false}
                 axisLine={false}
                 width={compact ? 48 : 64}
-                domain={["auto", "auto"]}
+                scale={scale}
+                domain={scale === "log" ? quaiDomain : ["auto", "auto"]}
+                tickCount={compact ? 4 : 5}
               />
               <Tooltip
                 content={
