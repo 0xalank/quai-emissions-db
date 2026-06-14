@@ -41,8 +41,8 @@ export default function QiPage() {
       </div>
 
       <div className="fade-in-stagger space-y-4 sm:space-y-6">
-        <QiRateChart from={from} to={to} />
         <QiImpliedPriceChart from={from} to={to} />
+        <QiRateChart from={from} to={to} />
         <QiConversionInfo from={from} to={to} />
       </div>
     </main>
