@@ -15,7 +15,7 @@ import {
 const MAINNET_DATE = "2025-01-29";
 
 export default function QiPage() {
-  const [tf, setTf] = useState<Timeframe>("30d");
+  const [tf, setTf] = useState<Timeframe>("all");
   const from = timeframeToFromIso(tf) ?? MAINNET_DATE;
   const to = todayIso();
 

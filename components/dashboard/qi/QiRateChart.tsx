@@ -9,6 +9,7 @@ import { useCompactViewport, useQiMarket } from "@/lib/hooks";
 import { formatPeriodDate } from "@/lib/format";
 import {
   formatQuaiPerQi,
+  isQiPriceLiveDate,
   QI_QUOTE_COLOR,
   qiToQuai,
 } from "./qi-format";
@@ -32,7 +33,7 @@ export function QiRateChart({ from, to }: { from: string; to: string }) {
     if (!data) return [];
     return data.map((r) => ({
       date: r.periodStart,
-      quote: qiToQuai(r),
+      quote: isQiPriceLiveDate(r.periodStart) ? qiToQuai(r) : null,
     }));
   }, [data]);
 
@@ -52,6 +53,9 @@ export function QiRateChart({ from, to }: { from: string; to: string }) {
           <p className="mt-2">
             Missing days mean the daily quote backfill has not stored that
             close-block response yet.
+          </p>
+          <p className="mt-2">
+            Qi price/rate history is shown from April 16, 2025 onward.
           </p>
         </InfoPopover>
       </div>

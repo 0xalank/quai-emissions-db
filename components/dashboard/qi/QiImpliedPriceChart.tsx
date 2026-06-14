@@ -10,6 +10,7 @@ import { formatPeriodDate } from "@/lib/format";
 import {
   formatCurrency,
   impliedQiPrice,
+  isQiPriceLiveDate,
   QI_PRICE_COLOR,
   QUAI_PRICE_COLOR,
   quaiPrice,
@@ -57,7 +58,7 @@ export function QiImpliedPriceChart({
     if (!data) return [];
     return data.map((r) => ({
       date: r.periodStart,
-      qiPrice: impliedQiPrice(r),
+      qiPrice: isQiPriceLiveDate(r.periodStart) ? impliedQiPrice(r) : null,
       quaiPrice: quaiPrice(r),
       quoteCurrency: r.quoteCurrency ?? "USDT",
     }));
@@ -66,10 +67,6 @@ export function QiImpliedPriceChart({
   const hasPrice = chartData.some((r) => r.qiPrice != null);
   const qiDomain = useMemo(
     () => priceDomain(chartData.map((r) => r.qiPrice)),
-    [chartData],
-  );
-  const quaiDomain = useMemo(
-    () => priceDomain(chartData.map((r) => r.quaiPrice)),
     [chartData],
   );
 
@@ -111,6 +108,10 @@ export function QiImpliedPriceChart({
             <p className="mt-2">
               QUAI candles come from MEXC. Days without a candle still keep the
               chain quote, but cannot produce an implied price.
+            </p>
+            <p className="mt-2">
+              Implied Qi price history is shown from April 16, 2025 onward.
+              The QUAI close line always stays on a linear scale.
             </p>
           </InfoPopover>
         </div>
@@ -164,8 +165,8 @@ export function QiImpliedPriceChart({
                 tickLine={false}
                 axisLine={false}
                 width={compact ? 48 : 64}
-                scale={scale}
-                domain={scale === "log" ? quaiDomain : ["auto", "auto"]}
+                scale="linear"
+                domain={["auto", "auto"]}
                 tickCount={compact ? 4 : 5}
               />
               <Tooltip

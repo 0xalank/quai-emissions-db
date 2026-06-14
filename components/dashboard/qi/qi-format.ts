@@ -5,6 +5,11 @@ export const QI_QUOTE_COLOR = "#e20101";
 export const QI_PRICE_COLOR = "#10b981";
 export const QUAI_PRICE_COLOR = "#64748b";
 export const QI_SUPPLY_COLOR = "#f59e0b";
+export const QI_PRICE_LIVE_DATE = "2025-04-16";
+
+export function isQiPriceLiveDate(periodStart: string): boolean {
+  return periodStart >= QI_PRICE_LIVE_DATE;
+}
 
 export function qiToQuai(row: QiMarketRow): number | null {
   return row.qiToQuaiWeiPerQi == null
