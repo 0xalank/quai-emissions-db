@@ -377,6 +377,132 @@ export async function upsertCoinbaseRewards(
   }
 }
 
+// ── market_prices_daily / qi_daily_quotes upserts ───────────────────────
+
+export type MarketPriceDailyRow = {
+  source: string;
+  symbol: string;
+  quote_currency: string;
+  period_start: string;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string | null;
+  quote_volume: string | null;
+  source_open_time_ms: number;
+  source_close_time_ms: number;
+};
+
+const MARKET_PRICE_PARAMS_PER_ROW = 12;
+
+async function upsertMarketPricesDailyChunk(
+  rows: MarketPriceDailyRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const values: unknown[] = [];
+  const placeholders: string[] = [];
+  let i = 1;
+  for (const r of rows) {
+    placeholders.push(
+      `($${i},$${i + 1},$${i + 2},$${i + 3}::date,$${i + 4},$${i + 5},` +
+        `$${i + 6},$${i + 7},$${i + 8},$${i + 9},$${i + 10},$${i + 11})`,
+    );
+    values.push(
+      r.source,
+      r.symbol,
+      r.quote_currency,
+      r.period_start,
+      r.open,
+      r.high,
+      r.low,
+      r.close,
+      r.volume,
+      r.quote_volume,
+      r.source_open_time_ms,
+      r.source_close_time_ms,
+    );
+    i += MARKET_PRICE_PARAMS_PER_ROW;
+  }
+
+  await pool.query(
+    `INSERT INTO market_prices_daily
+       (source, symbol, quote_currency, period_start,
+        open, high, low, close, volume, quote_volume,
+        source_open_time_ms, source_close_time_ms)
+     VALUES ${placeholders.join(",")}
+     ON CONFLICT (source, symbol, quote_currency, period_start) DO UPDATE SET
+       open                 = EXCLUDED.open,
+       high                 = EXCLUDED.high,
+       low                  = EXCLUDED.low,
+       close                = EXCLUDED.close,
+       volume               = EXCLUDED.volume,
+       quote_volume         = EXCLUDED.quote_volume,
+       source_open_time_ms  = EXCLUDED.source_open_time_ms,
+       source_close_time_ms = EXCLUDED.source_close_time_ms,
+       fetched_at           = now()`,
+    values,
+  );
+}
+
+export async function upsertMarketPricesDaily(
+  rows: MarketPriceDailyRow[],
+): Promise<void> {
+  const max = maxRowsPerStmt(MARKET_PRICE_PARAMS_PER_ROW);
+  for (let i = 0; i < rows.length; i += max) {
+    await upsertMarketPricesDailyChunk(rows.slice(i, i + max));
+  }
+}
+
+export type QiDailyQuoteRow = {
+  period_start: string;
+  block_number: number;
+  qi_amount_qits: bigint;
+  quai_amount_wei: bigint;
+};
+
+const QI_DAILY_QUOTE_PARAMS_PER_ROW = 4;
+
+async function upsertQiDailyQuotesChunk(
+  rows: QiDailyQuoteRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const values: unknown[] = [];
+  const placeholders: string[] = [];
+  let i = 1;
+  for (const r of rows) {
+    placeholders.push(`($${i}::date,$${i + 1},$${i + 2},$${i + 3})`);
+    values.push(
+      r.period_start,
+      r.block_number,
+      r.qi_amount_qits.toString(),
+      r.quai_amount_wei.toString(),
+    );
+    i += QI_DAILY_QUOTE_PARAMS_PER_ROW;
+  }
+
+  await pool.query(
+    `INSERT INTO qi_daily_quotes
+       (period_start, block_number, qi_amount_qits, quai_amount_wei)
+     VALUES ${placeholders.join(",")}
+     ON CONFLICT (period_start) DO UPDATE SET
+       block_number     = EXCLUDED.block_number,
+       qi_amount_qits   = EXCLUDED.qi_amount_qits,
+       quai_amount_wei  = EXCLUDED.quai_amount_wei,
+       indexed_at       = now()`,
+    values,
+  );
+}
+
+export async function upsertQiDailyQuotes(
+  rows: QiDailyQuoteRow[],
+): Promise<void> {
+  const max = maxRowsPerStmt(QI_DAILY_QUOTE_PARAMS_PER_ROW);
+  for (let i = 0; i < rows.length; i += max) {
+    await upsertQiDailyQuotesChunk(rows.slice(i, i + max));
+  }
+}
+
 export async function close(): Promise<void> {
   await pool.end();
 }

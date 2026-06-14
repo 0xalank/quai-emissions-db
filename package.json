@@ -18,6 +18,7 @@
     "backfill": "tsx --env-file=.env.local scripts/ingest/backfill.ts",
     "backfill:workshares": "tsx --env-file=.env.local scripts/ingest/backfill-workshares.ts",
     "backfill:coinbase-rewards": "tsx --env-file=.env.local scripts/ingest/backfill-coinbase-rewards.ts",
+    "backfill:qi-market": "tsx --env-file=.env.local scripts/ingest/backfill-qi-market.ts",
     "backfill:smoke": "tsx --env-file=.env.local scripts/ingest/backfill.ts --limit=1000",
     "rollup": "tsx --env-file=.env.local scripts/ingest/rollup.ts"
   },

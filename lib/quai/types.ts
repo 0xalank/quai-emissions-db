@@ -227,6 +227,37 @@ export type SupplyRow = {
   cumulativeMinedQuai?: bigint;
 };
 
+/** Daily Qi dashboard row. `qiToQuaiWeiPerQi` is the chain quote returned by
+ * quai_qiToQuai(1000 qits, daily close block), expressed as QUAI wei. MEXC
+ * price fields are decimal strings because they are exchange quote data, not
+ * integer chain units. */
+export type QiMarketRow = {
+  periodStart: string;
+  firstBlock: number;
+  lastBlock: number;
+  blockCount: number;
+  partial: boolean;
+  qiTotalEnd: bigint;
+  qiAddedSum: bigint;
+  qiRemovedSum: bigint;
+  qiNetEmitted: bigint;
+  winnerQuaiCount: number;
+  winnerQiCount: number;
+  conversionFlowSum: bigint;
+  rateOpen: bigint;
+  rateHigh: bigint;
+  rateLow: bigint;
+  rateClose: bigint;
+  qiQuoteBlock: number | null;
+  qiToQuaiWeiPerQi: bigint | null;
+  priceSource: string | null;
+  quoteCurrency: string | null;
+  quaiPriceOpen: string | null;
+  quaiPriceHigh: string | null;
+  quaiPriceLow: string | null;
+  quaiPriceClose: string | null;
+};
+
 export type GrainMeta = {
   rows: number;
   earliestPeriod: string | null;

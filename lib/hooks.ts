@@ -5,6 +5,7 @@ import { reviveBig } from "@/lib/quai/serialize";
 import type {
   MiningInfo,
   Period,
+  QiMarketRow,
   Rollup,
   RollupsMeta,
   SupplyAnalytics,
@@ -198,6 +199,26 @@ export function useSupply(args: {
       if (!res.ok) throw new Error(`supply ${res.status}`);
       const raw = (await res.json()) as { period: string; rows: unknown };
       return reviveBig<SupplyRow[]>(raw.rows);
+    },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Hook for /api/qi. Daily rows include the chain Qi→QUAI quote and optional
+ * exchange market data for deriving an implied Qi price. */
+export function useQiMarket(args: { from: string; to: string }) {
+  return useQuery<QiMarketRow[]>({
+    queryKey: ["qi-market", args.from, args.to],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/qi?period=day&from=${args.from}&to=${args.to}`,
+      );
+      if (!res.ok) throw new Error(`qi ${res.status}`);
+      const raw = (await res.json()) as { period: string; rows: unknown };
+      return reviveBig<QiMarketRow[]>(raw.rows);
     },
     staleTime: 60_000,
     refetchInterval: 60_000,

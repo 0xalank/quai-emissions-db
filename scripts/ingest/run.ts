@@ -63,6 +63,7 @@ import {
   type MiningInfoRow,
 } from "./db";
 import { runRollups } from "./rollup";
+import { syncQiMarketData } from "./qi-market";
 import type { NormalizedBlock } from "../../lib/quai/types";
 
 const FINALITY_BUFFER = 15; // 5-block cushion past REORG_DEPTH
@@ -81,6 +82,7 @@ const BACKFILL_SAMPLE_EVERY = 60;
 const BACKFILL_CHUNK = 10_000;
 const TAIL_POLL_MS = 3000;
 const ERROR_BACKOFF_MS = 5000;
+const MARKET_SYNC_MS = 15 * 60_000;
 
 let shuttingDown = false;
 const sigHandler = (sig: string) => {
@@ -401,9 +403,28 @@ async function reorgCheck(lastIngested: number): Promise<void> {
   }
 }
 
+async function maybeSyncQiMarketData(state: {
+  lastMarketSyncAt: number;
+}): Promise<void> {
+  const now = Date.now();
+  if (now - state.lastMarketSyncAt < MARKET_SYNC_MS) return;
+  state.lastMarketSyncAt = now;
+
+  try {
+    const result = await syncQiMarketData({ quoteLimit: 1000 });
+    console.log(
+      `[ingest] qi market sync: ${result.qiQuotes} qi_quotes, ${result.marketPrices} market_prices`,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[ingest] qi market sync skipped: ${msg}`);
+  }
+}
+
 async function iterate(state: {
   mode: "backfill" | "tail" | null;
   backfillWroteBlocks: boolean;
+  lastMarketSyncAt: number;
   backfillStart: number;
   backfillStartedAt: number;
   startedAt: number;
@@ -476,6 +497,7 @@ async function iterate(state: {
           `[ingest] rollup complete in ${dt}s  ${JSON.stringify(r)}`,
         );
         state.backfillWroteBlocks = false;
+        await maybeSyncQiMarketData(state);
       }
       // Flip backfill_done once caught up. Idempotent — safe if already true.
       if (!cursor.backfill_done) {
@@ -483,6 +505,7 @@ async function iterate(state: {
           `UPDATE ingest_cursor SET backfill_done = true WHERE id = 1`,
         );
       }
+      await maybeSyncQiMarketData(state);
     }
 
     if (head > cursor.last_ingested_block) {
@@ -504,6 +527,7 @@ async function iterate(state: {
       state.blocksWritten += n;
       if (n > 0) {
         await runRollups(prevCursor + 1);
+        await maybeSyncQiMarketData(state);
         const elapsed = (Date.now() - tailStart) / 1000;
         const lag = Math.max(0, head - (prevCursor + n));
         const lifetimeMinutes = Math.max((Date.now() - state.startedAt) / 60_000, 0.001);
@@ -529,6 +553,7 @@ async function main(): Promise<void> {
   const state = {
     mode: null as "backfill" | "tail" | null,
     backfillWroteBlocks: false,
+    lastMarketSyncAt: 0,
     backfillStart: 0,
     backfillStartedAt: 0,
     startedAt: Date.now(),
