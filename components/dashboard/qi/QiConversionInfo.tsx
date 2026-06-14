@@ -44,7 +44,7 @@ export function QiConversionInfo({
             {String(error)}
           </div>
         ) : (
-          <div className="grid gap-3 text-sm leading-6 text-slate-800 dark:text-white/72 lg:grid-cols-2">
+          <div className="grid gap-3 text-sm leading-6 text-white lg:grid-cols-2">
             <p>
               The Qi quote is indexed from{" "}
               <span className="font-mono text-xs">quai_qiToQuai</span> at the
@@ -59,7 +59,7 @@ export function QiConversionInfo({
             <p>
               Quai and Qi supply rows come from chain supply analytics, so the
               selected range currently shows{" "}
-              <span className="font-medium text-slate-950 dark:text-white">
+              <span className="font-medium text-white">
                 {formatQi(qiNet)}
               </span>{" "}
               net Qi supply movement.
