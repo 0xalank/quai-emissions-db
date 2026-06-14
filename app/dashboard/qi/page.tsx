@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { QiConversionInfo } from "@/components/dashboard/qi/QiConversionInfo";
+import { QiExplainer } from "@/components/dashboard/qi/QiExplainer";
 import { QiHero } from "@/components/dashboard/qi/QiHero";
 import { QiImpliedPriceChart } from "@/components/dashboard/qi/QiImpliedPriceChart";
 import { QiRateChart } from "@/components/dashboard/qi/QiRateChart";
@@ -24,6 +25,10 @@ export default function QiPage() {
 
   return (
     <main className="mx-auto max-w-[1400px] px-3 py-4 sm:px-4 sm:py-6 md:px-8 md:py-10">
+      <div className="mb-4 sm:mb-5">
+        <QiExplainer />
+      </div>
+
       <div className="mb-4 sm:mb-5">
         <QiHero from={from} to={to} />
       </div>
