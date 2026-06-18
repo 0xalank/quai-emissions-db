@@ -22,7 +22,7 @@ npm install
 # 2. start local Postgres, then configure environment
 npm run db:up
 cp .env.local.example .env.local
-$EDITOR .env.local        # set DATABASE_URL; QUAI_ZONE_RPC has a sane default
+$EDITOR .env.local        # set DATABASE_URL; RPC defaults are usable
 npm run validate:env
 
 # 3. apply schema (eight migrations, idempotent, transaction-wrapped)
@@ -64,7 +64,8 @@ covers the SOAP-active period.
 | var | required | default | purpose |
 |---|---|---|---|
 | `DATABASE_URL` | **yes** | — | Postgres connection string. Used by migrations, ingest worker, and route handlers. |
-| `QUAI_ZONE_RPC` | no | `https://rpc.quai.network/${NEXT_PUBLIC_QUAI_ZONE}` | Single zone JSON-RPC endpoint. All RPC calls (blocks, supply analytics, balances, getMiningInfo) go here. |
+| `QUAI_ZONE_RPC` | no | `https://rpc.quai.network/${NEXT_PUBLIC_QUAI_ZONE}` | Single zone JSON-RPC endpoint for ingest/backfill calls. Use the debug endpoint when historical `quai_getMiningInfo(block, false)` is needed. |
+| `QUAI_PUBLIC_RPC` | no | `https://rpc.quai.network/${NEXT_PUBLIC_QUAI_ZONE}` | Public/current-tip RPC for live dashboard KPIs. May be set to `https://rpc.quai.network` or a zone URL. |
 | `NEXT_PUBLIC_QUAI_ZONE` | no | `cyprus1` | Zone slug — also used by the URL fallback above and surfaced in the UI. |
 | `NEXT_PUBLIC_ROLLUPS_ENABLED` | no | `false` | Gate flag for the rollup chart grid on `/dashboard/history`. Set to `true` once `/api/rollups` is healthy. |
 
@@ -229,7 +230,7 @@ nginx reverse-proxy config:
 |---|---|
 | [`deploy/quai-emissions-ingest.service`](./deploy/quai-emissions-ingest.service) | systemd unit for the long-lived ingest worker (`Restart=on-failure` with backoff) |
 | [`deploy/quai-emissions-dashboard.service`](./deploy/quai-emissions-dashboard.service) | systemd unit for `next start` (`Restart=always`) |
-| [`deploy/nginx-quai-emissions.conf`](./deploy/nginx-quai-emissions.conf) | nginx site — HTTPS reverse proxy → `:3000`, HTTP/2, HSTS, immutable cache for `/_next/static`, gzip |
+| [`deploy/nginx-quai-emissions.conf`](./deploy/nginx-quai-emissions.conf) | nginx site — HTTPS reverse proxy → `:3029`, HTTP/2, HSTS, immutable cache for `/_next/static`, gzip |
 | [`deploy/README.md`](./deploy/README.md) | step-by-step install + Let's Encrypt + updates + troubleshooting |
 
 Quick path for a fresh Ubuntu host:

@@ -24,7 +24,7 @@ async function main(): Promise<void> {
   await run("dashboard service", "systemctl", ["is-active", "quai-emissions-dashboard"]);
   await run("ingest service", "systemctl", ["is-active", "quai-emissions-ingest"]);
   await run("nginx config", "nginx", ["-t"]);
-  await run("local health", "curl", ["-fsS", "http://127.0.0.1:3000/api/health"]);
+  await run("local health", "curl", ["-fsS", "http://127.0.0.1:3029/api/health"]);
 }
 
 main().catch((err) => {

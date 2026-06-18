@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     const proxied = await proxyToUpstreamApi(req);
     if (proxied) return proxied;
 
-    // Mining info comes from `quai_getMiningInfo` on the zone RPC; supply +
+    // Live mining info comes from the public/current-tip RPC; supply +
     // analytics + burn come from the rollup store.
     const [info, analytics] = await Promise.all([
       fetchMiningInfo(),

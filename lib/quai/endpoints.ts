@@ -1,4 +1,4 @@
-import { ZONE_RPC } from "./constants";
+import { LIVE_STATS_RPC, ZONE_RPC } from "./constants";
 import type { MiningInfo } from "./types";
 
 const hexToBigInt = (h: string | undefined): bigint =>
@@ -30,24 +30,24 @@ type MiningInfoRaw = {
   };
 };
 
+type MiningInfoParams = [] | [boolean] | [string, boolean];
+type MiningInfoPayload = {
+  result?: MiningInfoRaw["result"];
+  error?: { code?: number; message?: string };
+};
+
 const toBigIntHashRate = (v: string | number): bigint => {
   if (typeof v === "number") return BigInt(Math.trunc(v));
   if (v.startsWith("0x")) return BigInt(v);
   return BigInt(v);
 };
 
-/**
- * Live mining/supply snapshot via `quai_getMiningInfo(latest, decimal=false)`.
- *
- * Uses the 2-arg signature from go-quai PR 2696. Requires ZONE_RPC to point
- * at a node carrying that patch (e.g. debug.rpc.quai.network/cyprus1). Stock
- * mainnet nodes still on the 1-arg signature will 400; when the PR merges
- * upstream, all nodes will accept this shape.
- */
-export async function fetchMiningInfo(
+async function requestMiningInfo(
+  rpcUrl: string,
+  params: MiningInfoParams,
   signal?: AbortSignal,
-): Promise<MiningInfo> {
-  const res = await fetch(ZONE_RPC, {
+): Promise<MiningInfoPayload> {
+  const res = await fetch(rpcUrl, {
     method: "POST",
     signal,
     cache: "no-store",
@@ -59,11 +59,14 @@ export async function fetchMiningInfo(
       jsonrpc: "2.0",
       id: 1,
       method: "quai_getMiningInfo",
-      params: ["latest", false],
+      params,
     }),
   });
   if (!res.ok) throw new Error(`getMiningInfo ${res.status}`);
-  const payload = (await res.json()) as { result?: MiningInfoRaw["result"]; error?: { message?: string } };
+  return (await res.json()) as MiningInfoPayload;
+}
+
+function normalizeMiningInfo(payload: MiningInfoPayload): MiningInfo {
   if (!payload.result) {
     throw new Error(`getMiningInfo: ${payload.error?.message ?? "no result"}`);
   }
@@ -96,4 +99,47 @@ export async function fetchMiningInfo(
     avgTxFees: hexToBigInt(r.avgTxFees),
     quaiSupplyTotal: hexToBigInt(r.quaiSupplyTotal),
   };
+}
+
+/**
+ * Live mining/supply snapshot via `quai_getMiningInfo`.
+ *
+ * Public gateway nodes currently expose the current-tip signature
+ * `quai_getMiningInfo(false)`/`quai_getMiningInfo()`. Patched debug nodes also
+ * expose the historical signature `quai_getMiningInfo("latest", false)`.
+ * Live dashboard KPIs prefer the public endpoint, then fall back to ZONE_RPC.
+ */
+export async function fetchMiningInfo(
+  signal?: AbortSignal,
+): Promise<MiningInfo> {
+  const candidates = [
+    {
+      rpcUrl: LIVE_STATS_RPC,
+      params: [[false], [], ["latest", false]] satisfies MiningInfoParams[],
+    },
+    ...(LIVE_STATS_RPC === ZONE_RPC
+      ? []
+      : [
+          {
+            rpcUrl: ZONE_RPC,
+            params: [["latest", false], [false], []] satisfies MiningInfoParams[],
+          },
+        ]),
+  ];
+
+  const errors: string[] = [];
+  for (const candidate of candidates) {
+    for (const params of candidate.params) {
+      try {
+        return normalizeMiningInfo(
+          await requestMiningInfo(candidate.rpcUrl, params, signal),
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        errors.push(`${candidate.rpcUrl} params=${JSON.stringify(params)}: ${message}`);
+      }
+    }
+  }
+
+  throw new Error(`getMiningInfo failed: ${errors.join("; ")}`);
 }

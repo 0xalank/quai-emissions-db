@@ -69,6 +69,14 @@ if (!["http:", "https:"].includes(rpc.protocol)) {
   fail("QUAI_ZONE_RPC must use http:// or https://.");
 }
 
+const publicRpcRaw =
+  process.env.QUAI_PUBLIC_RPC ??
+  `https://rpc.quai.network/${process.env.NEXT_PUBLIC_QUAI_ZONE ?? "cyprus1"}`;
+const publicRpc = requireUrl("QUAI_PUBLIC_RPC", publicRpcRaw);
+if (!["http:", "https:"].includes(publicRpc.protocol)) {
+  fail("QUAI_PUBLIC_RPC must use http:// or https://.");
+}
+
 const zone = process.env.NEXT_PUBLIC_QUAI_ZONE ?? "cyprus1";
 if (!/^[a-z0-9-]+$/i.test(zone)) {
   fail("NEXT_PUBLIC_QUAI_ZONE must be a simple zone slug such as cyprus1.");
@@ -79,4 +87,7 @@ if (rollups !== undefined && !["true", "false"].includes(rollups)) {
   fail("NEXT_PUBLIC_ROLLUPS_ENABLED must be true or false when set.");
 }
 
-console.log(`[env] ok: db=${db.hostname}${db.port ? `:${db.port}` : ""}${db.pathname} rpc=${rpc.href}`);
+console.log(
+  `[env] ok: db=${db.hostname}${db.port ? `:${db.port}` : ""}${db.pathname}` +
+    ` rpc=${rpc.href} publicRpc=${publicRpc.href}`,
+);

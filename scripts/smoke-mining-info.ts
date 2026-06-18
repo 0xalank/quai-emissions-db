@@ -6,12 +6,12 @@ import { resolve } from "node:path";
 
 config({ path: resolve(process.cwd(), ".env.local") });
 
-// Dynamic import AFTER env is loaded so ZONE_RPC resolves from .env.local.
+// Dynamic import AFTER env is loaded so RPC constants resolve from .env.local.
 async function main() {
-  const { ZONE_RPC } = await import("../lib/quai/constants");
+  const { LIVE_STATS_RPC, ZONE_RPC } = await import("../lib/quai/constants");
   const { fetchMiningInfo } = await import("../lib/quai/endpoints");
 
-  console.log(`[smoke] ZONE_RPC=${ZONE_RPC}`);
+  console.log(`[smoke] LIVE_STATS_RPC=${LIVE_STATS_RPC}  ZONE_RPC=${ZONE_RPC}`);
   const t0 = performance.now();
   const info = await fetchMiningInfo();
   const ms = Math.round(performance.now() - t0);

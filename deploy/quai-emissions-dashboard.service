@@ -7,7 +7,7 @@
 # Replace before installing:
 #   - User=quai            → the unprivileged user that owns the deploy
 #   - WorkingDirectory     → absolute path to your checkout
-#   - PORT=3000            → adjust if 3000 conflicts with another service
+#   - PORT=3029            → adjust if 3029 conflicts with another service
 #
 # Install:
 #   cd /srv/quai-emissions-db && sudo -u quai npm ci && sudo -u quai npm run build
@@ -31,7 +31,7 @@ User=quai
 Group=quai
 WorkingDirectory=/srv/quai-emissions-db
 Environment=NODE_ENV=production
-Environment=PORT=3000
+Environment=PORT=3029
 ExecStart=/usr/bin/env npm run start
 
 # Dashboard should be up unless told otherwise — restart aggressively.

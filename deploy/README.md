@@ -4,7 +4,7 @@ Production layout this directory targets:
 
 ```
                                 ┌──────────────────────────┐
-   internet ──→ nginx :443 ──→  │  Next.js  :3000          │  (systemd: quai-emissions-dashboard)
+   internet ──→ nginx :443 ──→  │  Next.js  :3029          │  (systemd: quai-emissions-dashboard)
                                 └──────────────────────────┘
                                             │
                                             ▼
@@ -25,7 +25,7 @@ Files in this directory:
 |---|---|
 | `quai-emissions-ingest.service` | systemd unit for the long-lived ingest worker |
 | `quai-emissions-dashboard.service` | systemd unit for `next start` |
-| `nginx-quai-emissions.conf` | nginx site (HTTPS reverse proxy → :3000) |
+| `nginx-quai-emissions.conf` | nginx site (HTTPS reverse proxy → :3029) |
 
 ---
 
@@ -159,7 +159,7 @@ retrying — `systemctl reset-failed quai-emissions-ingest` to retry.
 **`502 Bad Gateway` from nginx**
 → Either the dashboard service is down (`systemctl status
 quai-emissions-dashboard`) or it's bound to a different port (check
-`Environment=PORT=3000` in the unit file matches the nginx `proxy_pass`).
+`Environment=PORT=3029` in the unit file matches the nginx `proxy_pass`).
 
 **Nginx loads but charts are empty**
 → Confirm `NEXT_PUBLIC_ROLLUPS_ENABLED=true` is set in `.env.local` *and*
