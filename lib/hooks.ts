@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { reviveBig } from "@/lib/quai/serialize";
 import type {
+  PowMarketHistory,
+  PowMarketQuote,
+} from "@/lib/comparisons/pow-dominance";
+import type {
   MiningInfo,
   Period,
   QiMarketRow,
@@ -222,6 +226,51 @@ export function useQiMarket(args: { from: string; to: string }) {
     },
     staleTime: 60_000,
     refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export type PowMarketsPayload = {
+  source: string;
+  fetchedAt: string;
+  rows: PowMarketQuote[];
+};
+
+export function usePowMarkets() {
+  return useQuery<PowMarketsPayload>({
+    queryKey: ["pow-markets"],
+    queryFn: async () => {
+      const res = await fetch("/api/pow-markets");
+      if (!res.ok) throw new Error(`pow-markets ${res.status}`);
+      return (await res.json()) as PowMarketsPayload;
+    },
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export type PowMarketHistoryPayload = {
+  source: string;
+  fetchedAt: string;
+  from: string;
+  to: string;
+  rows: PowMarketHistory[];
+  errors?: { id: string; message: string }[];
+};
+
+export function usePowMarketHistory(args: { from: string; to: string }) {
+  return useQuery<PowMarketHistoryPayload>({
+    queryKey: ["pow-market-history", args.from, args.to],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/pow-market-history?from=${args.from}&to=${args.to}`,
+      );
+      if (!res.ok) throw new Error(`pow-market-history ${res.status}`);
+      return (await res.json()) as PowMarketHistoryPayload;
+    },
+    staleTime: 30 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });

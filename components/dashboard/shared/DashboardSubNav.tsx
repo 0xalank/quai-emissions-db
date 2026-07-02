@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/dashboard", label: "Home", exact: true },
   { href: "/dashboard/mining", label: "Mining" },
+  { href: "/dashboard/pow-dominance", label: "PoW Dominance" },
   { href: "/dashboard/qi", label: "Qi" },
   { href: "/dashboard/faq", label: "FAQs" },
 ];

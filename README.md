@@ -68,6 +68,7 @@ covers the SOAP-active period.
 | `QUAI_PUBLIC_RPC` | no | `https://rpc.quai.network/${NEXT_PUBLIC_QUAI_ZONE}` | Public/current-tip RPC for live dashboard KPIs. May be set to `https://rpc.quai.network` or a zone URL. |
 | `NEXT_PUBLIC_QUAI_ZONE` | no | `cyprus1` | Zone slug — also used by the URL fallback above and surfaced in the UI. |
 | `NEXT_PUBLIC_ROLLUPS_ENABLED` | no | `false` | Gate flag for the rollup chart grid on `/dashboard/history`. Set to `true` once `/api/rollups` is healthy. |
+| `COINGECKO_DEMO_API_KEY` / `COINGECKO_PRO_API_KEY` | no | — | Optional key for `/api/pow-markets`, used by the PoW Dominance page's external price and market-cap comparisons. |
 
 The example file (`.env.local.example`) is the canonical reference. The
 `.env.local` you create from it is gitignored along with every other
@@ -107,6 +108,7 @@ The root `/` redirects to `/dashboard`.
 |---|---|---|
 | `/dashboard` | holders | Hero (6 KPIs) · SOAP + Singularity callouts · supply story · Qi cumulative · mining-issuance-since-SOAP · QUAI vs Bitcoin emission curves to 2050 |
 | `/dashboard/mining` | miners | Hero (4 KPIs) · per-algorithm composition flagship · QUAI rewarded per algorithm · hashrate · block reward · top coinbases (last 7d) |
+| `/dashboard/pow-dominance` | analysts | QUAI security-cost ratio vs BTC · tracked PoW budget share · reward-spend comparison table · capacity-cost efficiency · SOAP offset |
 | `/dashboard/history` | analysts | URL-state-driven period × range slicer with the legacy 8-chart grid |
 
 ---
@@ -124,6 +126,8 @@ Internal-stable. Documented for transparency, not contract.
 | `/api/rollups/meta` | rollup date bounds and row counts | 60 s |
 | `/api/supply?period=&from=&to=&include=qi,burn,genesis` | realized-circulating math from `v_supply_*` views | 60 s + 5 m SWR |
 | `/api/coinbase-leaderboard?days=&limit=` | top coinbases by blocks won | 5 m |
+| `/api/pow-markets` | CoinGecko price and market-cap quotes for tracked PoW networks | 60 s + 5 m SWR |
+| `/api/pow-market-history?from=&to=` | CoinGecko daily historical prices for tracked PoW networks | 30 m + 1 h SWR |
 
 ---
 
