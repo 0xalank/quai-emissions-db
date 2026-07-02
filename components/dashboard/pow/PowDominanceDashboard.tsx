@@ -918,14 +918,19 @@ function SecurityCostsTable({
             miner P&amp;L model. It intentionally excludes transaction fees,
             hardware depreciation, pool fees, and retained miner margin.
           </p>
+          <p className="mt-2">
+            Throughput is the capacity assumption used by the capacity-cost
+            comparison below. It is not observed daily utilization.
+          </p>
         </InfoPopover>
       </div>
 
       <div className="mt-3 overflow-x-auto">
-        <table className="min-w-[900px] w-full border-collapse text-left text-sm">
+        <table className="min-w-[980px] w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-slate-900/10 text-xs uppercase tracking-wider text-slate-900/50 dark:border-white/10 dark:text-white/45">
               <th className="py-2 pr-4 font-normal">Network</th>
+              <th className="py-2 pr-4 font-normal">Throughput</th>
               <th className="py-2 pr-4 font-normal">Daily security cost</th>
               <th className="py-2 pr-4 font-normal">Subsidy/day</th>
               <th className="py-2 pr-4 font-normal">Price</th>
@@ -972,6 +977,18 @@ function SecurityCostsTable({
                         </div>
                       </div>
                     </div>
+                  </td>
+                  <td className="py-3 pr-4 font-mono">
+                    <span
+                      className={cn(
+                        "inline-flex whitespace-nowrap rounded-md border px-2 py-1 text-xs",
+                        m.isQuai
+                          ? "border-quai-500/40 bg-quai-500/[0.08] font-semibold text-quai-600 dark:border-quai-400/40 dark:bg-quai-400/[0.10] dark:text-quai-300"
+                          : "border-transparent text-slate-900/75 dark:text-white/70",
+                      )}
+                    >
+                      {m.capacityTps.toLocaleString()} TPS
+                    </span>
                   </td>
                   <td className="py-3 pr-4 font-mono">
                     {usd(m.dailySecurityCostUsd, true)}
