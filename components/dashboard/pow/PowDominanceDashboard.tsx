@@ -26,16 +26,13 @@ import { cn } from "@/lib/utils";
 import { SOAP_ACTIVATION_DATE } from "@/lib/quai/protocol-constants";
 import type { QiMarketRow, Rollup, SupplyRow } from "@/lib/quai/types";
 import {
-  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  ComposedChart,
   LabelList,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -258,28 +255,6 @@ function formatMultiple(n: number | null | undefined): string {
 function annualizedSecuritySpendUsd(metric: PowNetworkMetric): number | null {
   if (metric.dailySecurityCostUsd == null) return null;
   return metric.dailySecurityCostUsd * 365;
-}
-
-function annualizedRewardInflationPct(metric: PowNetworkMetric): number | null {
-  const annualSpend = annualizedSecuritySpendUsd(metric);
-  if (
-    annualSpend == null ||
-    metric.marketCapUsd == null ||
-    metric.marketCapUsd <= 0
-  ) {
-    return null;
-  }
-  return (annualSpend / metric.marketCapUsd) * 100;
-}
-
-function soapAdjustedInflationPct(
-  metric: PowNetworkMetric,
-  soapOffset: number | null,
-): number | null {
-  const gross = annualizedRewardInflationPct(metric);
-  if (gross == null || soapOffset == null) return null;
-  const retained = Math.max(0, 1 - soapOffset / 100);
-  return gross * retained;
 }
 
 export function PowDominanceDashboard() {
@@ -555,7 +530,11 @@ export function PowDominanceDashboard() {
           metrics={derived.metrics}
           btc={derived.btcMetric}
           securityTotal={derived.securityTotal}
-          soapOffset={derived.soapOffset}
+        />
+
+        <SoapUmbrellaCard
+          externalMetrics={derived.externalMetrics}
+          quai={derived.quaiMetric}
         />
 
         <CapacityPerDollarChart metrics={derived.metrics} isLoading={loading} />
@@ -573,19 +552,6 @@ export function PowDominanceDashboard() {
             marketCapShare={derived.quaiMarketCapShare}
             securityTotal={derived.securityTotal}
             marketCapTotal={derived.marketCapTotal}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
-          <NetIssuanceChart
-            rollups={rollups}
-            isLoading={rollupsLoading}
-            className="xl:col-span-3"
-          />
-          <SoapUmbrellaCard
-            externalMetrics={derived.externalMetrics}
-            quai={derived.quaiMetric}
-            className="xl:col-span-2"
           />
         </div>
 
@@ -986,12 +952,10 @@ function SecurityCostsTable({
   metrics,
   btc,
   securityTotal,
-  soapOffset,
 }: {
   metrics: PowNetworkMetric[];
   btc: PowNetworkMetric | null;
   securityTotal: number | null;
-  soapOffset: number | null;
 }) {
   const rows = [...metrics].sort(
     (a, b) => (b.dailySecurityCostUsd ?? -1) - (a.dailySecurityCostUsd ?? -1),
@@ -1023,7 +987,6 @@ function SecurityCostsTable({
               <th className="py-2 pr-4 font-normal">Throughput</th>
               <th className="py-2 pr-4 font-normal">Daily security cost</th>
               <th className="py-2 pr-4 font-normal">Annualized spend</th>
-              <th className="py-2 pr-4 font-normal">Reward inflation</th>
               <th className="py-2 pr-4 font-normal">Subsidy/day</th>
               <th className="py-2 pr-4 font-normal">Price</th>
               <th className="py-2 pr-4 font-normal">Ratio vs BTC</th>
@@ -1046,10 +1009,6 @@ function SecurityCostsTable({
                   ? (m.dailySecurityCostUsd / securityTotal) * 100
                   : null;
               const annualSpend = annualizedSecuritySpendUsd(m);
-              const rewardInflation = annualizedRewardInflationPct(m);
-              const soapAdjustedInflation = m.isQuai
-                ? soapAdjustedInflationPct(m, soapOffset)
-                : null;
               return (
                 <tr
                   key={m.id}
@@ -1092,14 +1051,6 @@ function SecurityCostsTable({
                   </td>
                   <td className="py-3 pr-4 font-mono">
                     {usd(annualSpend, true)}
-                  </td>
-                  <td className="py-3 pr-4 font-mono">
-                    <div>{pct(rewardInflation, 3)}</div>
-                    {soapAdjustedInflation != null && (
-                      <div className="mt-0.5 text-[0.68rem] text-emerald-700 dark:text-emerald-300">
-                        after SOAP {pct(soapAdjustedInflation, 3)}
-                      </div>
-                    )}
                   </td>
                   <td className="py-3 pr-4 font-mono">
                     {tokenAmount(m.dailySubsidy, m.symbol)}
@@ -1162,12 +1113,12 @@ function CapacityPerDollarChart({
   return (
     <Card>
       <div className="chart-card-header">
-        <CardTitle>Capacity funded per security dollar</CardTitle>
-        <InfoPopover label="About capacity per dollar">
+        <CardTitle>Transactions supported per $1 paid to miners</CardTitle>
+        <InfoPopover label="About transactions per miner dollar">
           <p>
-            Capacity transactions funded per $1 of daily reward spend: capacity
-            transactions per day divided by daily security cost. Higher means
-            each dollar paid to miners underwrites more transaction capacity.
+            This compares how much maximum transaction capacity each network
+            gets for the money it pays miners each day. It divides capacity
+            transactions per day by daily miner rewards in USD.
           </p>
           <p className="mt-2">
             Uses each network's capacity assumption (see the assumptions table
@@ -1223,7 +1174,7 @@ function CapacityPerDollarChart({
               />
               <Bar
                 dataKey="value"
-                name="Capacity tx per $1 of daily spend"
+                name="Transactions supported per $1 paid to miners"
                 barSize={18}
                 radius={[0, 4, 4, 0]}
                 isAnimationActive
@@ -1251,206 +1202,19 @@ function CapacityPerDollarChart({
 
       {leadMultiple != null && (
         <div className="mt-3 rounded-md border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2 text-sm text-slate-900/70 dark:text-white/70">
-          Each security dollar funds{" "}
+          At current rewards and prices, $1 paid to miners supports{" "}
           <span className="font-mono text-emerald-700 dark:text-emerald-300">
             {formatMultiple(leadMultiple)}
           </span>{" "}
-          more capacity on QUAI than on {bestOther?.label}, the next-most
-          efficient tracked network.
+          more transaction capacity on QUAI than on {bestOther?.label}, the
+          next-most efficient tracked network.
         </div>
       )}
 
       <p className="mt-4 text-xs leading-5 text-slate-900/50 dark:text-white/50">
-        Linear scale on purpose: the bar lengths are the honest gap. Values are
-        labeled on every bar because the non-QUAI bars round to zero pixels at
-        this scale.
-      </p>
-    </Card>
-  );
-}
-
-type NetIssuancePoint = {
-  date: string;
-  gross: number;
-  burned: number;
-  net: number;
-};
-
-function NetIssuanceChart({
-  rollups,
-  isLoading,
-  className,
-}: {
-  rollups: Rollup[] | undefined;
-  isLoading: boolean;
-  className?: string;
-}) {
-  const compact = useCompactViewport();
-  const data = useMemo(() => {
-    const rows = rollups ?? [];
-    const out: NetIssuancePoint[] = [];
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      const prev = rows[i - 1];
-      if (
-        row.blockCount === 0 ||
-        row.coinbaseRewardIndexedCount < row.blockCount ||
-        row.coinbaseQuaiLockedRewardSum <= 0n
-      ) {
-        continue;
-      }
-      const gross = weiToFloat(row.coinbaseQuaiLockedRewardSum, 2);
-      const burned = weiToFloat(row.burnClose - prev.burnClose, 2);
-      out.push({
-        date: row.periodStart,
-        gross,
-        burned,
-        net: gross - burned,
-      });
-    }
-    return out;
-  }, [rollups]);
-
-  const deflationaryDays = useMemo(
-    () => data.filter((d) => d.net <= 0).length,
-    [data],
-  );
-
-  const legendEntries = [
-    { label: "Gross mined", color: "var(--chart-axis-muted)" },
-    { label: "SOAP burn", color: "#f59e0b" },
-    { label: "Net issuance", color: "#e20101" },
-  ];
-
-  return (
-    <Card className={className}>
-      <div className="chart-card-header">
-        <CardTitle>QUAI net issuance after SOAP burn</CardTitle>
-        <InfoPopover label="About net issuance">
-          <p>
-            Gross mined is each fully indexed day's exact lockup-adjusted
-            coinbase rewards. SOAP burn is that day's authoritative{" "}
-            <code>burn_close</code> delta. Net issuance is gross minus burn.
-          </p>
-          <p className="mt-2">
-            No other network tracked on this page offsets miner emissions with
-            a burn, so only QUAI has a net line below its gross line.
-          </p>
-        </InfoPopover>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-1 sm:gap-1.5">
-        {legendEntries.map((entry) => (
-          <span
-            key={entry.label}
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-slate-900/[0.04] px-1.5 py-0.5 text-[0.68rem] text-slate-800 dark:border-white/10 dark:bg-white/[0.06] dark:text-white/75 sm:px-2 sm:text-xs"
-          >
-            <span
-              aria-hidden
-              className="inline-block h-2 w-2 shrink-0 rounded-sm"
-              style={{ background: entry.color }}
-            />
-            <span>{entry.label}</span>
-          </span>
-        ))}
-      </div>
-
-      <div className="chart-shell">
-        {isLoading ? (
-          <ChartSkeleton />
-        ) : data.length === 0 ? (
-          <div className="text-sm text-slate-900/50 dark:text-white/50">
-            Awaiting fully indexed reward days.
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart
-              data={data}
-              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid
-                stroke="var(--chart-grid-soft)"
-                strokeDasharray="2 4"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="date"
-                tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
-                tickFormatter={formatPeriodDate}
-                tickLine={false}
-                axisLine={false}
-                minTickGap={compact ? 72 : 48}
-              />
-              <YAxis
-                tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
-                tickFormatter={(v) => formatCompact(Number(v))}
-                tickLine={false}
-                axisLine={false}
-                width={compact ? 56 : 72}
-              />
-              <Tooltip
-                content={
-                  <ChartTooltip
-                    labelFormatter={(v) => formatPeriodDate(String(v))}
-                    formatter={(v, name) => [
-                      tokenAmount(Number(v), "QUAI"),
-                      name,
-                    ]}
-                  />
-                }
-              />
-              <ReferenceLine
-                y={0}
-                stroke="var(--chart-reference-line)"
-                strokeWidth={1}
-              />
-              <Area
-                type="monotone"
-                dataKey="gross"
-                name="Gross mined"
-                stroke="var(--chart-axis-muted)"
-                strokeWidth={1.5}
-                fill="var(--chart-grid)"
-                fillOpacity={1}
-                isAnimationActive
-                animationDuration={500}
-                animationEasing="ease-out"
-              />
-              <Line
-                type="monotone"
-                dataKey="burned"
-                name="SOAP burn"
-                stroke="#f59e0b"
-                strokeWidth={1.5}
-                dot={false}
-                isAnimationActive
-                animationDuration={500}
-                animationEasing="ease-out"
-              />
-              <Line
-                type="monotone"
-                dataKey="net"
-                name="Net issuance"
-                stroke="#e20101"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive
-                animationDuration={500}
-                animationEasing="ease-out"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-
-      <p className="mt-4 text-xs leading-5 text-slate-900/50 dark:text-white/50">
-        Daily QUAI tokens: gross mined, SOAP burn, and the net issuance the
-        market actually absorbs. Days where the red line touches or crosses
-        zero are net-deflationary
-        {deflationaryDays > 0
-          ? ` (${deflationaryDays} in this window)`
-          : ""}
-        .
+        This is a capacity-efficiency view, not observed traffic. Linear scale
+        is intentional; every bar is labeled because the gap is too large for
+        most non-QUAI bars to stay visually prominent.
       </p>
     </Card>
   );
@@ -1468,6 +1232,8 @@ function SoapUmbrellaCard({
   className?: string;
 }) {
   const bySymbol = new Map(externalMetrics.map((m) => [m.symbol, m]));
+  const btc = bySymbol.get("BTC") ?? null;
+  const bch = bySymbol.get("BCH") ?? null;
   const segments = SOAP_UMBRELLA_ORDER.map((symbol) => bySymbol.get(symbol))
     .filter(
       (m): m is PowNetworkMetric =>
@@ -1481,36 +1247,102 @@ function SoapUmbrellaCard({
     total != null && quaiCost != null && quaiCost > 0
       ? total / quaiCost
       : null;
+  const bchCost = bch?.dailySecurityCostUsd ?? null;
+  const btcCost = btc?.dailySecurityCostUsd ?? null;
+  const addressableWithoutBch =
+    total != null && bchCost != null ? total - bchCost : null;
+  const bchLiftPct =
+    bchCost != null && addressableWithoutBch != null && addressableWithoutBch > 0
+      ? (bchCost / addressableWithoutBch) * 100
+      : null;
+  const bchMultiple =
+    bchCost != null && quaiCost != null && quaiCost > 0
+      ? bchCost / quaiCost
+      : null;
 
   return (
     <Card className={className}>
       <div className="chart-card-header">
-        <CardTitle>SOAP-addressable security umbrella</CardTitle>
+        <CardTitle>SOAP-addressable security if SHA uses BCH</CardTitle>
         <InfoPopover label="About the umbrella">
           <p>
-            Combined daily reward spend on the tracked networks whose
-            algorithms SOAP can merge-mine: BCH and LTC-style SHA/Scrypt work
-            plus DOGE and RVN. Miners on these chains can submit the same work
-            to Quai as workshares without giving up their existing revenue.
+            BTC stays in the table as the main security-cost benchmark. This
+            panel shows the tracked miner reward spend that can actually become
+            SOAP-addressable: BCH for SHA, LTC and DOGE for Scrypt, and RVN for
+            KawPoW.
           </p>
           <p className="mt-2">
-            This measures the addressable pool of merge-mineable hashpower
-            spend, not spend currently securing Quai.
+            It measures the addressable pool of merge-mineable work, not spend
+            currently securing Quai.
           </p>
         </InfoPopover>
       </div>
 
-      <div className="mt-4">
-        <div className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
-          {usd(total, true)}
-          <span className="ml-1 text-base font-normal text-slate-900/50 dark:text-white/50">
-            /day
-          </span>
-        </div>
-        <div className="mt-1 text-xs text-slate-900/50 dark:text-white/50">
-          Merge-mineable PoW reward spend QUAI can tap through SOAP.
-        </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <SoapStoryStat
+          label="SOAP-addressable rewards"
+          value={`${usd(total, true)}/day`}
+          detail="BCH + LTC + DOGE + RVN miner rewards."
+          tone="quai"
+        />
+        <SoapStoryStat
+          label="Added by using BCH for SHA"
+          value={`${usd(bchCost, true)}/day`}
+          detail={
+            bchLiftPct == null
+              ? "Awaiting BCH market data."
+              : `${pct(bchLiftPct, 1)} more than Scrypt + KawPoW alone.`
+          }
+          tone="emerald"
+        />
+        <SoapStoryStat
+          label="Compared with QUAI direct spend"
+          value={formatMultiple(multiple)}
+          detail={
+            bchMultiple == null
+              ? "Awaiting QUAI or BCH reward data."
+              : `BCH alone is ${formatMultiple(bchMultiple)} QUAI direct spend.`
+          }
+        />
       </div>
+
+      <div className="mt-4 rounded-md border border-quai-500/20 bg-quai-500/[0.05] px-3 py-2 text-sm leading-6 text-slate-900/70 dark:text-white/70">
+        <p>
+          The BTC row shows the benchmark security budget, but BTC contributes{" "}
+          <span className="font-mono">$0/day</span> to this SOAP-addressable
+          pool. If the SHA leg is framed around BCH instead,{" "}
+          <span className="font-mono text-quai-600 dark:text-quai-400">
+            {usd(bchCost, true)}/day
+          </span>{" "}
+          of SHA miner rewards becomes part of the addressable story.
+        </p>
+        <p className="mt-2 text-xs text-slate-900/50 dark:text-white/50">
+          BTC daily rewards are still shown in the table as{" "}
+          <span className="font-mono">{usd(btcCost, true)}/day</span>, but this
+          panel counts only tracked algorithms with a SOAP route.
+        </p>
+      </div>
+
+      {total != null && addressableWithoutBch != null && (
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded-md border border-slate-900/10 p-3 dark:border-white/10">
+            <div className="text-xs uppercase tracking-wider text-slate-900/45 dark:text-white/45">
+              Without BCH SHA route
+            </div>
+            <div className="mt-1 font-mono text-lg text-slate-900 dark:text-white">
+              {usd(addressableWithoutBch, true)}/day
+            </div>
+          </div>
+          <div className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.05] p-3">
+            <div className="text-xs uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+              With BCH SHA route
+            </div>
+            <div className="mt-1 font-mono text-lg text-slate-900 dark:text-white">
+              {usd(total, true)}/day
+            </div>
+          </div>
+        </div>
+      )}
 
       {segments.length > 0 && total != null && total > 0 && (
         <>
@@ -1526,7 +1358,7 @@ function SoapUmbrellaCard({
             ))}
           </div>
 
-          <div className="mt-3 grid gap-1.5">
+          <div className="mt-3 grid gap-1.5 md:grid-cols-2">
             {segments.map((m) => {
               const share =
                 m.dailySecurityCostUsd == null
@@ -1557,23 +1389,42 @@ function SoapUmbrellaCard({
           </div>
         </>
       )}
-
-      <div className="mt-4 rounded-md border border-quai-500/20 bg-quai-500/[0.05] px-3 py-2 text-sm text-slate-900/70 dark:text-white/70">
-        {multiple == null ? (
-          "Awaiting market data for the umbrella comparison."
-        ) : (
-          <>
-            ≈{" "}
-            <span className="font-mono text-quai-600 dark:text-quai-400">
-              {formatMultiple(multiple)}
-            </span>{" "}
-            QUAI&apos;s direct daily security spend (
-            {usd(quaiCost, true)}) is already paid to miners on algorithms
-            that can merge-mine QUAI.
-          </>
-        )}
-      </div>
     </Card>
+  );
+}
+
+function SoapStoryStat({
+  label,
+  value,
+  detail,
+  tone = "slate",
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "quai" | "emerald" | "slate";
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-md border p-3",
+        tone === "quai" &&
+          "border-quai-500/20 bg-quai-500/[0.05] dark:border-quai-400/20",
+        tone === "emerald" &&
+          "border-emerald-500/20 bg-emerald-500/[0.05] dark:border-emerald-400/20",
+        tone === "slate" && "border-slate-900/10 dark:border-white/10",
+      )}
+    >
+      <div className="text-xs uppercase tracking-wider text-slate-900/45 dark:text-white/45">
+        {label}
+      </div>
+      <div className="mt-1 font-mono text-lg text-slate-900 dark:text-white">
+        {value}
+      </div>
+      <div className="mt-1 text-xs leading-5 text-slate-900/55 dark:text-white/55">
+        {detail}
+      </div>
+    </div>
   );
 }
 
