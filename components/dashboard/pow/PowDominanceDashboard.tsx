@@ -30,6 +30,8 @@ import {
   Line,
   LineChart,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
@@ -216,6 +218,33 @@ function sumNullable(values: Array<number | null>): number | null {
   );
   if (known.length === 0) return null;
   return known.reduce((acc, v) => acc + v, 0);
+}
+
+function annualizedSecuritySpendUsd(metric: PowNetworkMetric): number | null {
+  if (metric.dailySecurityCostUsd == null) return null;
+  return metric.dailySecurityCostUsd * 365;
+}
+
+function annualizedRewardInflationPct(metric: PowNetworkMetric): number | null {
+  const annualSpend = annualizedSecuritySpendUsd(metric);
+  if (
+    annualSpend == null ||
+    metric.marketCapUsd == null ||
+    metric.marketCapUsd <= 0
+  ) {
+    return null;
+  }
+  return (annualSpend / metric.marketCapUsd) * 100;
+}
+
+function soapAdjustedInflationPct(
+  metric: PowNetworkMetric,
+  soapOffset: number | null,
+): number | null {
+  const gross = annualizedRewardInflationPct(metric);
+  if (gross == null || soapOffset == null) return null;
+  const retained = Math.max(0, 1 - soapOffset / 100);
+  return gross * retained;
 }
 
 export function PowDominanceDashboard() {
@@ -482,10 +511,16 @@ export function PowDominanceDashboard() {
           historyErrors={powMarketHistory?.errors ?? []}
         />
 
+        <SecurityInflationChart
+          metrics={derived.metrics}
+          soapOffset={derived.soapOffset}
+        />
+
         <SecurityCostsTable
           metrics={derived.metrics}
           btc={derived.btcMetric}
           securityTotal={derived.securityTotal}
+          soapOffset={derived.soapOffset}
         />
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -894,14 +929,237 @@ function SecurityBudgetLegend({
   );
 }
 
+type SecurityInflationPoint = {
+  id: string;
+  label: string;
+  symbol: string;
+  color: string;
+  annualSecuritySpendUsd: number;
+  rewardInflationPct: number;
+  annualRewardsTokens: number | null;
+  marketCapUsd: number | null;
+  note: string;
+};
+
+function SecurityInflationChart({
+  metrics,
+  soapOffset,
+}: {
+  metrics: PowNetworkMetric[];
+  soapOffset: number | null;
+}) {
+  const compact = useCompactViewport();
+  const points = useMemo(() => {
+    const out: SecurityInflationPoint[] = [];
+    for (const metric of metrics) {
+      const annualSpend = annualizedSecuritySpendUsd(metric);
+      const inflation = annualizedRewardInflationPct(metric);
+      if (annualSpend == null || inflation == null) continue;
+      out.push({
+        id: metric.id,
+        label: metric.label,
+        symbol: metric.symbol,
+        color: metric.color,
+        annualSecuritySpendUsd: annualSpend,
+        rewardInflationPct: inflation,
+        annualRewardsTokens:
+          metric.dailySubsidy == null ? null : metric.dailySubsidy * 365,
+        marketCapUsd: metric.marketCapUsd,
+        note: metric.isQuai
+          ? "Gross QUAI miner reward value before SOAP burn offset."
+          : "Gross PoW reward value.",
+      });
+
+      if (metric.isQuai) {
+        const adjusted = soapAdjustedInflationPct(metric, soapOffset);
+        if (adjusted != null) {
+          out.push({
+            id: "quai-soap-adjusted",
+            label: "Quai SOAP-adjusted",
+            symbol: "QUAI net",
+            color: "#10b981",
+            annualSecuritySpendUsd: annualSpend,
+            rewardInflationPct: adjusted,
+            annualRewardsTokens:
+              metric.dailySubsidy == null || soapOffset == null
+                ? null
+                : metric.dailySubsidy *
+                  365 *
+                  Math.max(0, 1 - soapOffset / 100),
+            marketCapUsd: metric.marketCapUsd,
+            note: "Same gross miner security budget, but net dilution after selected-window SOAP burn offset.",
+          });
+        }
+      }
+    }
+    return out;
+  }, [metrics, soapOffset]);
+
+  const xMax = useMemo(() => {
+    const max = Math.max(0, ...points.map((p) => p.rewardInflationPct));
+    return max > 0 ? max * 1.15 : 1;
+  }, [points]);
+  const yMax = useMemo(() => {
+    const max = Math.max(0, ...points.map((p) => p.annualSecuritySpendUsd));
+    return max > 0 ? max * 1.1 : 1;
+  }, [points]);
+
+  return (
+    <Card>
+      <div className="chart-card-header">
+        <CardTitle>Security spend vs reward inflation</CardTitle>
+        <InfoPopover label="About security spend vs inflation">
+          <p>
+            <span className="font-medium">Y-axis</span>: annualized security
+            spend, calculated as daily reward value × 365.
+          </p>
+          <p className="mt-2">
+            <span className="font-medium">X-axis</span>: annualized PoW reward
+            inflation pressure, calculated as annualized reward value divided by
+            market cap. This is a reward-value proxy, not an accounting estimate
+            of realized sell pressure.
+          </p>
+          <p className="mt-2">
+            QUAI appears twice when SOAP data is available: gross miner reward
+            spend, and SOAP-adjusted net dilution at the same gross security
+            budget.
+          </p>
+        </InfoPopover>
+      </div>
+
+      <div className="chart-shell-short">
+        {points.length === 0 ? (
+          <div className="text-sm text-slate-900/50 dark:text-white/50">
+            Awaiting market cap and reward data.
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid
+                stroke="var(--chart-grid-soft)"
+                strokeDasharray="2 4"
+                vertical={false}
+              />
+              <XAxis
+                type="number"
+                dataKey="rewardInflationPct"
+                name="Annualized reward inflation"
+                domain={[0, xMax]}
+                tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+                tickFormatter={(v) => pct(Number(v), compact ? 1 : 2)}
+                tickLine={false}
+                axisLine={false}
+                width={compact ? 46 : 64}
+              />
+              <YAxis
+                type="number"
+                dataKey="annualSecuritySpendUsd"
+                name="Annualized security spend"
+                scale="log"
+                domain={[1, yMax]}
+                tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+                tickFormatter={(v) => usd(Number(v), true)}
+                tickLine={false}
+                axisLine={false}
+                width={compact ? 58 : 76}
+              />
+              <Tooltip content={<SecurityInflationTooltip />} />
+              {points.map((point) => (
+                <Scatter
+                  key={point.id}
+                  name={point.label}
+                  data={[point]}
+                  fill={point.color}
+                  line={false}
+                  shape={point.id === "quai-soap-adjusted" ? "diamond" : "circle"}
+                />
+              ))}
+            </ScatterChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      <p className="mt-3 text-xs leading-5 text-slate-900/50 dark:text-white/50">
+        Better tokenomics sit farther up and left: more annualized security
+        budget for less reward-inflation pressure. The green QUAI point shows
+        selected-window SOAP-adjusted net dilution.
+      </p>
+    </Card>
+  );
+}
+
+function SecurityInflationTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: SecurityInflationPoint }>;
+}) {
+  if (!active || !payload?.[0]?.payload) return null;
+  const point = payload[0].payload;
+  return (
+    <div
+      className="max-w-[calc(100vw-2rem)] min-w-[220px] rounded-md border p-2.5 shadow-md"
+      style={{
+        background: "var(--chart-tooltip-bg)",
+        color: "var(--chart-tooltip-text)",
+        borderColor: "var(--chart-tooltip-border)",
+      }}
+      role="tooltip"
+    >
+      <div className="mb-1.5 flex items-center gap-2 text-[0.65rem] uppercase tracking-wider text-slate-900/55 dark:text-white/55">
+        <span
+          aria-hidden
+          className="h-2 w-2 rounded-sm"
+          style={{ background: point.color }}
+        />
+        {point.label}
+      </div>
+      <div className="grid gap-1 text-xs">
+        <div className="flex justify-between gap-3">
+          <span className="text-slate-900/65 dark:text-white/65">
+            Annual spend
+          </span>
+          <span className="font-mono text-slate-900 dark:text-white">
+            {usd(point.annualSecuritySpendUsd, true)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span className="text-slate-900/65 dark:text-white/65">
+            Reward inflation
+          </span>
+          <span className="font-mono text-slate-900 dark:text-white">
+            {pct(point.rewardInflationPct, 3)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span className="text-slate-900/65 dark:text-white/65">
+            Annual rewards
+          </span>
+          <span className="font-mono text-slate-900 dark:text-white">
+            {point.annualRewardsTokens == null
+              ? "—"
+              : tokenAmount(point.annualRewardsTokens, point.symbol)}
+          </span>
+        </div>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-900/55 dark:text-white/55">
+        {point.note}
+      </p>
+    </div>
+  );
+}
+
 function SecurityCostsTable({
   metrics,
   btc,
   securityTotal,
+  soapOffset,
 }: {
   metrics: PowNetworkMetric[];
   btc: PowNetworkMetric | null;
   securityTotal: number | null;
+  soapOffset: number | null;
 }) {
   const rows = [...metrics].sort(
     (a, b) => (b.dailySecurityCostUsd ?? -1) - (a.dailySecurityCostUsd ?? -1),
@@ -926,12 +1184,14 @@ function SecurityCostsTable({
       </div>
 
       <div className="mt-3 overflow-x-auto">
-        <table className="min-w-[980px] w-full border-collapse text-left text-sm">
+        <table className="min-w-[1200px] w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-slate-900/10 text-xs uppercase tracking-wider text-slate-900/50 dark:border-white/10 dark:text-white/45">
               <th className="py-2 pr-4 font-normal">Network</th>
               <th className="py-2 pr-4 font-normal">Throughput</th>
               <th className="py-2 pr-4 font-normal">Daily security cost</th>
+              <th className="py-2 pr-4 font-normal">Annualized spend</th>
+              <th className="py-2 pr-4 font-normal">Reward inflation</th>
               <th className="py-2 pr-4 font-normal">Subsidy/day</th>
               <th className="py-2 pr-4 font-normal">Price</th>
               <th className="py-2 pr-4 font-normal">Ratio vs BTC</th>
@@ -953,6 +1213,11 @@ function SecurityCostsTable({
                 securityTotal > 0
                   ? (m.dailySecurityCostUsd / securityTotal) * 100
                   : null;
+              const annualSpend = annualizedSecuritySpendUsd(m);
+              const rewardInflation = annualizedRewardInflationPct(m);
+              const soapAdjustedInflation = m.isQuai
+                ? soapAdjustedInflationPct(m, soapOffset)
+                : null;
               return (
                 <tr
                   key={m.id}
@@ -992,6 +1257,17 @@ function SecurityCostsTable({
                   </td>
                   <td className="py-3 pr-4 font-mono">
                     {usd(m.dailySecurityCostUsd, true)}
+                  </td>
+                  <td className="py-3 pr-4 font-mono">
+                    {usd(annualSpend, true)}
+                  </td>
+                  <td className="py-3 pr-4 font-mono">
+                    <div>{pct(rewardInflation, 3)}</div>
+                    {soapAdjustedInflation != null && (
+                      <div className="mt-0.5 text-[0.68rem] text-emerald-700 dark:text-emerald-300">
+                        SOAP-adj {pct(soapAdjustedInflation, 3)}
+                      </div>
+                    )}
                   </td>
                   <td className="py-3 pr-4 font-mono">
                     {tokenAmount(m.dailySubsidy, m.symbol)}
