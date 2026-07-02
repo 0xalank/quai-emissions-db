@@ -247,7 +247,7 @@ function formatTxPerDollar(v: number | null | undefined): string {
 
 function formatMultiple(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
-  if (n >= 1_000) return `${formatCompact(n)}x`;
+  if (n >= 1_000) return `${Math.round(n).toLocaleString()}x`;
   if (n >= 100) return `${Math.round(n)}x`;
   return `${n.toFixed(1)}x`;
 }
@@ -1241,129 +1241,143 @@ function SoapUmbrellaCard({
         m.mergeMiningNote != null &&
         m.dailySecurityCostUsd != null,
     );
-  const total = sumNullable(segments.map((m) => m.dailySecurityCostUsd));
+
   const quaiCost = quai.dailySecurityCostUsd;
-  const multiple =
-    total != null && quaiCost != null && quaiCost > 0
-      ? total / quaiCost
-      : null;
+  const addressableToday = sumNullable(
+    segments.map((m) => m.dailySecurityCostUsd),
+  );
   const bchCost = bch?.dailySecurityCostUsd ?? null;
   const btcCost = btc?.dailySecurityCostUsd ?? null;
-  const addressableWithoutBch =
-    total != null && bchCost != null ? total - bchCost : null;
-  const bchLiftPct =
-    bchCost != null && addressableWithoutBch != null && addressableWithoutBch > 0
-      ? (bchCost / addressableWithoutBch) * 100
+
+  // Scenario: same SOAP mechanics, but the SHA leg anchored on BTC instead
+  // of BCH. Pool = (addressable today − BCH) + BTC.
+  const btcScalePool =
+    addressableToday != null && bchCost != null && btcCost != null
+      ? addressableToday - bchCost + btcCost
       : null;
-  const bchMultiple =
-    bchCost != null && quaiCost != null && quaiCost > 0
-      ? bchCost / quaiCost
+
+  const addressableMultiple =
+    addressableToday != null && quaiCost != null && quaiCost > 0
+      ? addressableToday / quaiCost
       : null;
+  const btcScaleMultiple =
+    btcScalePool != null && quaiCost != null && quaiCost > 0
+      ? btcScalePool / quaiCost
+      : null;
+  const shaJump =
+    btcCost != null && bchCost != null && bchCost > 0
+      ? btcCost / bchCost
+      : null;
+
+  // One shared linear $/day scale across all three steps.
+  const scaleMax = Math.max(
+    btcScalePool ?? 0,
+    addressableToday ?? 0,
+    quaiCost ?? 0,
+  );
+
+  const nonShaSegments = segments.filter((m) => m.symbol !== "BCH");
 
   return (
     <Card className={className}>
       <div className="chart-card-header">
-        <CardTitle>SOAP-addressable security if SHA uses BCH</CardTitle>
-        <InfoPopover label="About the umbrella">
+        <CardTitle>SOAP-addressable security</CardTitle>
+        <InfoPopover label="About SOAP-addressable security">
           <p>
-            BTC stays in the table as the main security-cost benchmark. This
-            panel shows the tracked miner reward spend that can actually become
-            SOAP-addressable: BCH for SHA, LTC and DOGE for Scrypt, and RVN for
-            KawPoW.
+            Three steps on one linear $/day scale. <em>QUAI today</em> is what
+            QUAI pays its own miners. <em>Addressable via SOAP</em> is the
+            reward spend already paid on chains whose work QUAI accepts: BCH
+            for SHA, LTC and DOGE for Scrypt, RVN for KawPoW.
           </p>
           <p className="mt-2">
-            It measures the addressable pool of merge-mineable work, not spend
-            currently securing Quai.
+            <em>SHA at BTC scale</em> is an illustrative scenario, not current
+            hashpower: the same SOAP mechanics with the SHA leg anchored on
+            BTC instead of BCH. BTC contributes $0/day to the pool today.
           </p>
         </InfoPopover>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-        <SoapStoryStat
-          label="SOAP-addressable rewards"
-          value={`${usd(total, true)}/day`}
-          detail="BCH + LTC + DOGE + RVN miner rewards."
-          tone="quai"
-        />
-        <SoapStoryStat
-          label="Added by using BCH for SHA"
-          value={`${usd(bchCost, true)}/day`}
-          detail={
-            bchLiftPct == null
-              ? "Awaiting BCH market data."
-              : `${pct(bchLiftPct, 1)} more than Scrypt + KawPoW alone.`
+      <p className="mt-1 text-xs leading-5 text-slate-900/50 dark:text-white/50">
+        Where QUAI is today, what SOAP can tap now, and what the SHA leg looks
+        like at BTC scale.
+      </p>
+
+      <div className="mt-5 grid gap-5">
+        <SoapStep
+          step="1 · QUAI today"
+          chip={quaiCost != null ? "1x baseline" : null}
+          chipTone="slate"
+          value={quaiCost != null ? `${usd(quaiCost, true)}/day` : "—"}
+          description="Direct daily security spend — what QUAI currently pays its own miners (window average)."
+          segments={
+            quaiCost != null
+              ? [{ key: "QUAI", color: quai.color, value: quaiCost }]
+              : []
           }
-          tone="emerald"
+          max={scaleMax}
         />
-        <SoapStoryStat
-          label="Compared with QUAI direct spend"
-          value={formatMultiple(multiple)}
-          detail={
-            bchMultiple == null
-              ? "Awaiting QUAI or BCH reward data."
-              : `BCH alone is ${formatMultiple(bchMultiple)} QUAI direct spend.`
+
+        <SoapStep
+          step="2 · Addressable via SOAP now"
+          chip={
+            addressableMultiple != null
+              ? `${formatMultiple(addressableMultiple)} QUAI today`
+              : null
           }
+          chipTone="emerald"
+          value={
+            addressableToday != null
+              ? `${usd(addressableToday, true)}/day`
+              : "—"
+          }
+          description="Rewards already paid on merge-mineable chains: BCH (SHA) + LTC & DOGE (Scrypt) + RVN (KawPoW)."
+          segments={segments.map((m) => ({
+            key: m.symbol,
+            color: m.color,
+            value: m.dailySecurityCostUsd ?? 0,
+          }))}
+          max={scaleMax}
+        />
+
+        <SoapStep
+          step="3 · SHA leg at BTC scale"
+          chip={
+            btcScaleMultiple != null
+              ? `${formatMultiple(btcScaleMultiple)} QUAI today`
+              : null
+          }
+          chipTone="amber"
+          value={btcScalePool != null ? `${usd(btcScalePool, true)}/day` : "—"}
+          description="Scenario: the same pool with the SHA anchor moved from BCH to BTC. Not current hashpower — the scale the mechanics point at."
+          segments={
+            btcCost != null && btc != null
+              ? [
+                  { key: "BTC", color: btc.color, value: btcCost },
+                  ...nonShaSegments.map((m) => ({
+                    key: m.symbol,
+                    color: m.color,
+                    value: m.dailySecurityCostUsd ?? 0,
+                  })),
+                ]
+              : []
+          }
+          max={scaleMax}
         />
       </div>
 
-      <div className="mt-4 rounded-md border border-quai-500/20 bg-quai-500/[0.05] px-3 py-2 text-sm leading-6 text-slate-900/70 dark:text-white/70">
-        <p>
-          The BTC row shows the benchmark security budget, but BTC contributes{" "}
-          <span className="font-mono">$0/day</span> to this SOAP-addressable
-          pool. If the SHA leg is framed around BCH instead,{" "}
-          <span className="font-mono text-quai-600 dark:text-quai-400">
-            {usd(bchCost, true)}/day
-          </span>{" "}
-          of SHA miner rewards becomes part of the addressable story.
-        </p>
-        <p className="mt-2 text-xs text-slate-900/50 dark:text-white/50">
-          BTC daily rewards are still shown in the table as{" "}
-          <span className="font-mono">{usd(btcCost, true)}/day</span>, but this
-          panel counts only tracked algorithms with a SOAP route.
-        </p>
-      </div>
-
-      {total != null && addressableWithoutBch != null && (
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="rounded-md border border-slate-900/10 p-3 dark:border-white/10">
-            <div className="text-xs uppercase tracking-wider text-slate-900/45 dark:text-white/45">
-              Without BCH SHA route
-            </div>
-            <div className="mt-1 font-mono text-lg text-slate-900 dark:text-white">
-              {usd(addressableWithoutBch, true)}/day
-            </div>
+      <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className="rounded-md border border-slate-900/10 p-3 dark:border-white/10">
+          <div className="text-xs uppercase tracking-wider text-slate-900/45 dark:text-white/45">
+            Addressable today, by network
           </div>
-          <div className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.05] p-3">
-            <div className="text-xs uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-              With BCH SHA route
-            </div>
-            <div className="mt-1 font-mono text-lg text-slate-900 dark:text-white">
-              {usd(total, true)}/day
-            </div>
-          </div>
-        </div>
-      )}
-
-      {segments.length > 0 && total != null && total > 0 && (
-        <>
-          <div className="mt-4 flex h-3 w-full gap-[2px] overflow-hidden rounded-full">
-            {segments.map((m) => (
-              <div
-                key={m.symbol}
-                style={{
-                  width: `${((m.dailySecurityCostUsd ?? 0) / total) * 100}%`,
-                  background: m.color,
-                }}
-              />
-            ))}
-          </div>
-
-          <div className="mt-3 grid gap-1.5 md:grid-cols-2">
+          <div className="mt-2.5 grid gap-1.5">
             {segments.map((m) => {
               const share =
-                m.dailySecurityCostUsd == null
+                m.dailySecurityCostUsd == null ||
+                addressableToday == null ||
+                addressableToday <= 0
                   ? null
-                  : (m.dailySecurityCostUsd / total) * 100;
+                  : (m.dailySecurityCostUsd / addressableToday) * 100;
               return (
                 <div
                   key={m.symbol}
@@ -1376,6 +1390,9 @@ function SoapUmbrellaCard({
                       style={{ background: m.color }}
                     />
                     {m.label}
+                    <span className="text-xs text-slate-900/40 dark:text-white/40">
+                      {m.algorithm}
+                    </span>
                   </span>
                   <span className="font-mono text-slate-900 dark:text-white">
                     {usd(m.dailySecurityCostUsd, true)}
@@ -1387,43 +1404,145 @@ function SoapUmbrellaCard({
               );
             })}
           </div>
-        </>
-      )}
+        </div>
+
+        <div className="rounded-md border border-amber-500/20 bg-amber-500/[0.05] p-3">
+          <div className="text-xs uppercase tracking-wider text-amber-700 dark:text-amber-300">
+            The SHA leg: BCH → BTC
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+            <span className="inline-flex items-center gap-2">
+              <span
+                aria-hidden
+                className="h-2 w-2 rounded-sm"
+                style={{ background: bch?.color ?? "#8dc351" }}
+              />
+              <span className="text-slate-900/70 dark:text-white/65">
+                BCH
+              </span>
+              <span className="font-mono text-slate-900 dark:text-white">
+                {usd(bchCost, true)}/day
+              </span>
+            </span>
+            <span
+              aria-hidden
+              className="font-mono text-xs text-amber-700 dark:text-amber-300"
+            >
+              ─{shaJump != null ? ` ${formatMultiple(shaJump)} ` : "─"}→
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span
+                aria-hidden
+                className="h-2 w-2 rounded-sm"
+                style={{ background: btc?.color ?? "#f7931a" }}
+              />
+              <span className="text-slate-900/70 dark:text-white/65">
+                BTC
+              </span>
+              <span className="font-mono text-slate-900 dark:text-white">
+                {usd(btcCost, true)}/day
+              </span>
+            </span>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-900/55 dark:text-white/55">
+            Same SHA-256 work. Anchoring the SHA leg on BTC instead of BCH
+            multiplies that leg{" "}
+            {shaJump != null ? (
+              <span className="font-mono text-amber-700 dark:text-amber-300">
+                {formatMultiple(shaJump)}
+              </span>
+            ) : (
+              "—"
+            )}{" "}
+            — from a rounding error next to DOGE to the dominant share of the
+            pool.
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-4 text-xs leading-5 text-slate-900/50 dark:text-white/50">
+        All three bars share one linear $/day scale, so the steps are directly
+        comparable. Step 3 is a scenario — BTC miners do not currently point
+        hashpower at QUAI, and the table above still shows BTC as the
+        benchmark security budget.
+      </p>
     </Card>
   );
 }
 
-function SoapStoryStat({
-  label,
+function SoapStep({
+  step,
+  chip,
+  chipTone = "slate",
   value,
-  detail,
-  tone = "slate",
+  description,
+  segments,
+  max,
 }: {
-  label: string;
+  step: string;
+  chip: string | null;
+  chipTone?: "slate" | "emerald" | "amber";
   value: string;
-  detail: string;
-  tone?: "quai" | "emerald" | "slate";
+  description: string;
+  segments: { key: string; color: string; value: number }[];
+  max: number;
 }) {
+  const total = segments.reduce((acc, s) => acc + s.value, 0);
+  // Keep even the smallest step visible as a sliver on the shared scale.
+  const fillPct =
+    max > 0 && total > 0 ? Math.max((total / max) * 100, 0.35) : 0;
+
   return (
-    <div
-      className={cn(
-        "rounded-md border p-3",
-        tone === "quai" &&
-          "border-quai-500/20 bg-quai-500/[0.05] dark:border-quai-400/20",
-        tone === "emerald" &&
-          "border-emerald-500/20 bg-emerald-500/[0.05] dark:border-emerald-400/20",
-        tone === "slate" && "border-slate-900/10 dark:border-white/10",
-      )}
-    >
-      <div className="text-xs uppercase tracking-wider text-slate-900/45 dark:text-white/45">
-        {label}
+    <div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[0.68rem] font-semibold uppercase tracking-wider text-slate-900/55 dark:text-white/55">
+            {step}
+          </span>
+          {chip != null && (
+            <span
+              className={cn(
+                "rounded-full border px-1.5 py-0.5 font-mono text-[0.68rem]",
+                chipTone === "emerald" &&
+                  "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                chipTone === "amber" &&
+                  "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+                chipTone === "slate" &&
+                  "border-slate-900/15 bg-slate-900/[0.04] text-slate-900/60 dark:border-white/15 dark:bg-white/[0.06] dark:text-white/60",
+              )}
+            >
+              {chip}
+            </span>
+          )}
+        </div>
+        <span className="font-mono text-sm text-slate-900 dark:text-white">
+          {value}
+        </span>
       </div>
-      <div className="mt-1 font-mono text-lg text-slate-900 dark:text-white">
-        {value}
+
+      <div className="mt-1.5 h-4 w-full rounded-full bg-slate-900/[0.04] dark:bg-white/[0.06]">
+        {fillPct > 0 && (
+          <div
+            className="flex h-full gap-[2px] overflow-hidden rounded-full"
+            style={{ width: `${fillPct}%`, minWidth: "4px" }}
+          >
+            {segments.map((s) => (
+              <div
+                key={s.key}
+                style={{
+                  width: total > 0 ? `${(s.value / total) * 100}%` : "100%",
+                  minWidth: "2px",
+                  background: s.color,
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
-      <div className="mt-1 text-xs leading-5 text-slate-900/55 dark:text-white/55">
-        {detail}
-      </div>
+
+      <p className="mt-1.5 text-xs leading-5 text-slate-900/55 dark:text-white/55">
+        {description}
+      </p>
     </div>
   );
 }
