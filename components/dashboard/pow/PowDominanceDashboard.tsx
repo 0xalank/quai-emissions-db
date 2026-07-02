@@ -26,9 +26,16 @@ import { cn } from "@/lib/utils";
 import { SOAP_ACTIVATION_DATE } from "@/lib/quai/protocol-constants";
 import type { QiMarketRow, Rollup, SupplyRow } from "@/lib/quai/types";
 import {
+  Area,
+  Bar,
+  BarChart,
   CartesianGrid,
+  Cell,
+  ComposedChart,
+  LabelList,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -217,6 +224,35 @@ function sumNullable(values: Array<number | null>): number | null {
   );
   if (known.length === 0) return null;
   return known.reduce((acc, v) => acc + v, 0);
+}
+
+function capacityTxPerSecurityDollar(
+  metric: PowNetworkMetric,
+): number | null {
+  if (
+    metric.dailySecurityCostUsd == null ||
+    metric.dailySecurityCostUsd <= 0
+  ) {
+    return null;
+  }
+  return (
+    capacityTransactionsPerDay(metric.capacityTps) /
+    metric.dailySecurityCostUsd
+  );
+}
+
+function formatTxPerDollar(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  if (v >= 1_000) return `${formatCompact(v)} tx/$`;
+  if (v >= 1) return `${v.toFixed(1)} tx/$`;
+  return `${v.toFixed(2)} tx/$`;
+}
+
+function formatMultiple(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  if (n >= 1_000) return `${formatCompact(n)}x`;
+  if (n >= 100) return `${Math.round(n)}x`;
+  return `${n.toFixed(1)}x`;
 }
 
 function annualizedSecuritySpendUsd(metric: PowNetworkMetric): number | null {
@@ -522,6 +558,8 @@ export function PowDominanceDashboard() {
           soapOffset={derived.soapOffset}
         />
 
+        <CapacityPerDollarChart metrics={derived.metrics} isLoading={loading} />
+
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
           <PowEfficiencyCard
             quai={derived.quaiMetric}
@@ -535,6 +573,19 @@ export function PowDominanceDashboard() {
             marketCapShare={derived.quaiMarketCapShare}
             securityTotal={derived.securityTotal}
             marketCapTotal={derived.marketCapTotal}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+          <NetIssuanceChart
+            rollups={rollups}
+            isLoading={rollupsLoading}
+            className="xl:col-span-3"
+          />
+          <SoapUmbrellaCard
+            externalMetrics={derived.externalMetrics}
+            quai={derived.quaiMetric}
+            className="xl:col-span-2"
           />
         </div>
 
@@ -1066,6 +1117,461 @@ function SecurityCostsTable({
             })}
           </tbody>
         </table>
+      </div>
+    </Card>
+  );
+}
+
+type CapacityPerDollarRow = {
+  label: string;
+  symbol: string;
+  value: number;
+  isQuai: boolean;
+};
+
+function CapacityPerDollarChart({
+  metrics,
+  isLoading,
+}: {
+  metrics: PowNetworkMetric[];
+  isLoading: boolean;
+}) {
+  const compact = useCompactViewport();
+  const rows = useMemo(() => {
+    const out: CapacityPerDollarRow[] = [];
+    for (const m of metrics) {
+      const value = capacityTxPerSecurityDollar(m);
+      if (value == null) continue;
+      out.push({
+        label: m.label,
+        symbol: m.symbol,
+        value,
+        isQuai: m.isQuai === true,
+      });
+    }
+    return out.sort((a, b) => b.value - a.value);
+  }, [metrics]);
+
+  const quaiRow = rows.find((r) => r.isQuai) ?? null;
+  const bestOther = rows.find((r) => !r.isQuai) ?? null;
+  const leadMultiple =
+    quaiRow != null && bestOther != null && bestOther.value > 0
+      ? quaiRow.value / bestOther.value
+      : null;
+
+  return (
+    <Card>
+      <div className="chart-card-header">
+        <CardTitle>Capacity funded per security dollar</CardTitle>
+        <InfoPopover label="About capacity per dollar">
+          <p>
+            Capacity transactions funded per $1 of daily reward spend: capacity
+            transactions per day divided by daily security cost. Higher means
+            each dollar paid to miners underwrites more transaction capacity.
+          </p>
+          <p className="mt-2">
+            Uses each network's capacity assumption (see the assumptions table
+            below), not observed daily utilization.
+          </p>
+        </InfoPopover>
+      </div>
+
+      <div className="mt-3" style={{ height: rows.length > 0 ? rows.length * 40 + 40 : 280 }}>
+        {isLoading ? (
+          <ChartSkeleton />
+        ) : rows.length === 0 ? (
+          <div className="text-sm text-slate-900/50 dark:text-white/50">
+            Awaiting price and reward data.
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={rows}
+              layout="vertical"
+              margin={{ top: 4, right: compact ? 64 : 88, left: 8, bottom: 0 }}
+            >
+              <CartesianGrid
+                stroke="var(--chart-grid-soft)"
+                strokeDasharray="2 4"
+                horizontal={false}
+              />
+              <XAxis
+                type="number"
+                tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+                tickFormatter={(v) => formatCompact(Number(v))}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                type="category"
+                dataKey="label"
+                width={compact ? 76 : 100}
+                tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <Tooltip
+                cursor={{ fill: "var(--chart-grid-soft)" }}
+                content={
+                  <ChartTooltip
+                    formatter={(v, name) => [
+                      formatTxPerDollar(Number(v)),
+                      name,
+                    ]}
+                  />
+                }
+              />
+              <Bar
+                dataKey="value"
+                name="Capacity tx per $1 of daily spend"
+                barSize={18}
+                radius={[0, 4, 4, 0]}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
+              >
+                {rows.map((r) => (
+                  <Cell
+                    key={r.symbol}
+                    fill={r.isQuai ? "#e20101" : "var(--chart-axis-muted)"}
+                  />
+                ))}
+                <LabelList
+                  dataKey="value"
+                  position="right"
+                  fill="var(--chart-axis)"
+                  fontSize={11}
+                  formatter={(v) => formatTxPerDollar(Number(v))}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {leadMultiple != null && (
+        <div className="mt-3 rounded-md border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2 text-sm text-slate-900/70 dark:text-white/70">
+          Each security dollar funds{" "}
+          <span className="font-mono text-emerald-700 dark:text-emerald-300">
+            {formatMultiple(leadMultiple)}
+          </span>{" "}
+          more capacity on QUAI than on {bestOther?.label}, the next-most
+          efficient tracked network.
+        </div>
+      )}
+
+      <p className="mt-4 text-xs leading-5 text-slate-900/50 dark:text-white/50">
+        Linear scale on purpose: the bar lengths are the honest gap. Values are
+        labeled on every bar because the non-QUAI bars round to zero pixels at
+        this scale.
+      </p>
+    </Card>
+  );
+}
+
+type NetIssuancePoint = {
+  date: string;
+  gross: number;
+  burned: number;
+  net: number;
+};
+
+function NetIssuanceChart({
+  rollups,
+  isLoading,
+  className,
+}: {
+  rollups: Rollup[] | undefined;
+  isLoading: boolean;
+  className?: string;
+}) {
+  const compact = useCompactViewport();
+  const data = useMemo(() => {
+    const rows = rollups ?? [];
+    const out: NetIssuancePoint[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const prev = rows[i - 1];
+      if (
+        row.blockCount === 0 ||
+        row.coinbaseRewardIndexedCount < row.blockCount ||
+        row.coinbaseQuaiLockedRewardSum <= 0n
+      ) {
+        continue;
+      }
+      const gross = weiToFloat(row.coinbaseQuaiLockedRewardSum, 2);
+      const burned = weiToFloat(row.burnClose - prev.burnClose, 2);
+      out.push({
+        date: row.periodStart,
+        gross,
+        burned,
+        net: gross - burned,
+      });
+    }
+    return out;
+  }, [rollups]);
+
+  const deflationaryDays = useMemo(
+    () => data.filter((d) => d.net <= 0).length,
+    [data],
+  );
+
+  const legendEntries = [
+    { label: "Gross mined", color: "var(--chart-axis-muted)" },
+    { label: "SOAP burn", color: "#f59e0b" },
+    { label: "Net issuance", color: "#e20101" },
+  ];
+
+  return (
+    <Card className={className}>
+      <div className="chart-card-header">
+        <CardTitle>QUAI net issuance after SOAP burn</CardTitle>
+        <InfoPopover label="About net issuance">
+          <p>
+            Gross mined is each fully indexed day's exact lockup-adjusted
+            coinbase rewards. SOAP burn is that day's authoritative{" "}
+            <code>burn_close</code> delta. Net issuance is gross minus burn.
+          </p>
+          <p className="mt-2">
+            No other network tracked on this page offsets miner emissions with
+            a burn, so only QUAI has a net line below its gross line.
+          </p>
+        </InfoPopover>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1 sm:gap-1.5">
+        {legendEntries.map((entry) => (
+          <span
+            key={entry.label}
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-slate-900/[0.04] px-1.5 py-0.5 text-[0.68rem] text-slate-800 dark:border-white/10 dark:bg-white/[0.06] dark:text-white/75 sm:px-2 sm:text-xs"
+          >
+            <span
+              aria-hidden
+              className="inline-block h-2 w-2 shrink-0 rounded-sm"
+              style={{ background: entry.color }}
+            />
+            <span>{entry.label}</span>
+          </span>
+        ))}
+      </div>
+
+      <div className="chart-shell">
+        {isLoading ? (
+          <ChartSkeleton />
+        ) : data.length === 0 ? (
+          <div className="text-sm text-slate-900/50 dark:text-white/50">
+            Awaiting fully indexed reward days.
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={data}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid
+                stroke="var(--chart-grid-soft)"
+                strokeDasharray="2 4"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+                tickFormatter={formatPeriodDate}
+                tickLine={false}
+                axisLine={false}
+                minTickGap={compact ? 72 : 48}
+              />
+              <YAxis
+                tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+                tickFormatter={(v) => formatCompact(Number(v))}
+                tickLine={false}
+                axisLine={false}
+                width={compact ? 56 : 72}
+              />
+              <Tooltip
+                content={
+                  <ChartTooltip
+                    labelFormatter={(v) => formatPeriodDate(String(v))}
+                    formatter={(v, name) => [
+                      tokenAmount(Number(v), "QUAI"),
+                      name,
+                    ]}
+                  />
+                }
+              />
+              <ReferenceLine
+                y={0}
+                stroke="var(--chart-reference-line)"
+                strokeWidth={1}
+              />
+              <Area
+                type="monotone"
+                dataKey="gross"
+                name="Gross mined"
+                stroke="var(--chart-axis-muted)"
+                strokeWidth={1.5}
+                fill="var(--chart-grid)"
+                fillOpacity={1}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
+              />
+              <Line
+                type="monotone"
+                dataKey="burned"
+                name="SOAP burn"
+                stroke="#f59e0b"
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
+              />
+              <Line
+                type="monotone"
+                dataKey="net"
+                name="Net issuance"
+                stroke="#e20101"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      <p className="mt-4 text-xs leading-5 text-slate-900/50 dark:text-white/50">
+        Daily QUAI tokens: gross mined, SOAP burn, and the net issuance the
+        market actually absorbs. Days where the red line touches or crosses
+        zero are net-deflationary
+        {deflationaryDays > 0
+          ? ` (${deflationaryDays} in this window)`
+          : ""}
+        .
+      </p>
+    </Card>
+  );
+}
+
+const SOAP_UMBRELLA_ORDER = ["BCH", "LTC", "DOGE", "RVN"] as const;
+
+function SoapUmbrellaCard({
+  externalMetrics,
+  quai,
+  className,
+}: {
+  externalMetrics: PowNetworkMetric[];
+  quai: PowNetworkMetric;
+  className?: string;
+}) {
+  const bySymbol = new Map(externalMetrics.map((m) => [m.symbol, m]));
+  const segments = SOAP_UMBRELLA_ORDER.map((symbol) => bySymbol.get(symbol))
+    .filter(
+      (m): m is PowNetworkMetric =>
+        m != null &&
+        m.mergeMiningNote != null &&
+        m.dailySecurityCostUsd != null,
+    );
+  const total = sumNullable(segments.map((m) => m.dailySecurityCostUsd));
+  const quaiCost = quai.dailySecurityCostUsd;
+  const multiple =
+    total != null && quaiCost != null && quaiCost > 0
+      ? total / quaiCost
+      : null;
+
+  return (
+    <Card className={className}>
+      <div className="chart-card-header">
+        <CardTitle>SOAP-addressable security umbrella</CardTitle>
+        <InfoPopover label="About the umbrella">
+          <p>
+            Combined daily reward spend on the tracked networks whose
+            algorithms SOAP can merge-mine: BCH and LTC-style SHA/Scrypt work
+            plus DOGE and RVN. Miners on these chains can submit the same work
+            to Quai as workshares without giving up their existing revenue.
+          </p>
+          <p className="mt-2">
+            This measures the addressable pool of merge-mineable hashpower
+            spend, not spend currently securing Quai.
+          </p>
+        </InfoPopover>
+      </div>
+
+      <div className="mt-4">
+        <div className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          {usd(total, true)}
+          <span className="ml-1 text-base font-normal text-slate-900/50 dark:text-white/50">
+            /day
+          </span>
+        </div>
+        <div className="mt-1 text-xs text-slate-900/50 dark:text-white/50">
+          Merge-mineable PoW reward spend QUAI can tap through SOAP.
+        </div>
+      </div>
+
+      {segments.length > 0 && total != null && total > 0 && (
+        <>
+          <div className="mt-4 flex h-3 w-full gap-[2px] overflow-hidden rounded-full">
+            {segments.map((m) => (
+              <div
+                key={m.symbol}
+                style={{
+                  width: `${((m.dailySecurityCostUsd ?? 0) / total) * 100}%`,
+                  background: m.color,
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="mt-3 grid gap-1.5">
+            {segments.map((m) => {
+              const share =
+                m.dailySecurityCostUsd == null
+                  ? null
+                  : (m.dailySecurityCostUsd / total) * 100;
+              return (
+                <div
+                  key={m.symbol}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
+                  <span className="flex items-center gap-2 text-slate-900/70 dark:text-white/65">
+                    <span
+                      aria-hidden
+                      className="h-2 w-2 shrink-0 rounded-sm"
+                      style={{ background: m.color }}
+                    />
+                    {m.label}
+                  </span>
+                  <span className="font-mono text-slate-900 dark:text-white">
+                    {usd(m.dailySecurityCostUsd, true)}
+                    <span className="ml-2 text-xs text-slate-900/45 dark:text-white/45">
+                      {pct(share, 1)}
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <div className="mt-4 rounded-md border border-quai-500/20 bg-quai-500/[0.05] px-3 py-2 text-sm text-slate-900/70 dark:text-white/70">
+        {multiple == null ? (
+          "Awaiting market data for the umbrella comparison."
+        ) : (
+          <>
+            ≈{" "}
+            <span className="font-mono text-quai-600 dark:text-quai-400">
+              {formatMultiple(multiple)}
+            </span>{" "}
+            QUAI&apos;s direct daily security spend (
+            {usd(quaiCost, true)}) is already paid to miners on algorithms
+            that can merge-mine QUAI.
+          </>
+        )}
       </div>
     </Card>
   );
