@@ -42,7 +42,7 @@ import {
   walkBlocksByNums,
   walkMiningInfo,
 } from "../../lib/quai/blocks";
-import { walkCoinbaseRewardsByNums } from "../../lib/quai/coinbase-rewards";
+import { walkFullBlockSummariesByNums } from "../../lib/quai/coinbase-rewards";
 import { walkSupplyAnalytics } from "../../lib/quai/supply";
 import { ZONE_RPC } from "../../lib/quai/constants";
 import { KAWPOW_FORK_BLOCK } from "../../lib/quai/rewards";
@@ -57,9 +57,13 @@ import {
   upsertBlocks,
   upsertCoinbaseRewards,
   upsertMiningInfo,
+  upsertNetworkActivity,
   type AnalyticsRow,
+  type BlockActiveAddressRow,
+  type BlockActivityRow,
   type BlockRow,
   type CoinbaseRewardRow,
+  type AddressFirstSeenRow,
   type MiningInfoRow,
 } from "./db";
 import { runRollups } from "./rollup";
@@ -183,6 +187,9 @@ async function assertContinuity(
       newHash: Buffer.from(parentHex, "hex"),
       note: `rewound ${REORG_DEPTH} blocks to ${rewindTo}`,
     });
+    await pool.query(`DELETE FROM address_first_seen WHERE first_seen_block > $1`, [
+      rewindTo,
+    ]);
     await pool.query(`DELETE FROM blocks WHERE block_number > $1`, [rewindTo]);
     await pool.query(
       `UPDATE ingest_cursor
@@ -204,6 +211,7 @@ async function ingestRange(
   sampled: number;
   miningInfo: number;
   coinbaseRewards: number;
+  activityBlocks: number;
   dbWriteMs: number;
 }> {
   const expected = to - from + 1;
@@ -220,17 +228,35 @@ async function ingestRange(
   // primeTerminusNumber, so almost every column gets populated here.
   // Sampled path: full blocks to count workshares[]; getMiningInfo for
   // server-computed hashrate/reward. Both post-SOAP only for mining_info.
-  const coinbaseRewardsPromise: Promise<CoinbaseRewardRow[]> =
-    walkCoinbaseRewardsByNums(blockNums);
+  const fullBlockSummariesPromise = walkFullBlockSummariesByNums(blockNums);
 
-  const [headers, analyticsMap, burnMap, sampledBlocks, coinbaseRewardRows] =
+  const [headers, analyticsMap, burnMap, sampledBlocks, fullBlockSummaries] =
     await Promise.all([
       walkHeaders(from, to),
       walkSupplyAnalytics(from, to),
       batchBurnBalances(blockNums),
       walkBlocksByNums(sampledNums),
-      coinbaseRewardsPromise,
+      fullBlockSummariesPromise,
     ]);
+  const coinbaseRewardRows: CoinbaseRewardRow[] = fullBlockSummaries.map(
+    (row) => row.coinbaseReward,
+  );
+  const blockActivityRows: BlockActivityRow[] = fullBlockSummaries.map(
+    (row) => row.activity.blockActivity,
+  );
+  const blockAddressRows: BlockActiveAddressRow[] = fullBlockSummaries.flatMap(
+    (row) => row.activity.blockAddresses,
+  );
+  const headerTsByBlock = new Map(headers.map((b) => [b.number, b.timestamp]));
+  const firstSeenRows: AddressFirstSeenRow[] = fullBlockSummaries.flatMap((row) =>
+    row.activity.firstSeenAddresses.map((addressRow) => ({
+      ...addressRow,
+      first_seen_ts:
+        addressRow.first_seen_ts ||
+        headerTsByBlock.get(addressRow.first_seen_block) ||
+        0,
+    })),
+  );
 
   // --- Tier 1: strict coverage (dense path must cover every block) ---
   if (headers.length !== expected) {
@@ -256,6 +282,15 @@ async function ingestRange(
     for (let n = from; n <= to; n++) if (!got.has(n)) missing.push(n);
     throw new Error(
       `strict: expected ${expected} coinbase reward rows in #${from}..#${to}, got ${coinbaseRewardRows.length}. ` +
+        `Missing ${missing.length}: [${missing.slice(0, 8).join(",")}${missing.length > 8 ? ",…" : ""}]`,
+    );
+  }
+  if (blockActivityRows.length !== expected) {
+    const got = new Set(blockActivityRows.map((r) => r.block_number));
+    const missing: number[] = [];
+    for (let n = from; n <= to; n++) if (!got.has(n)) missing.push(n);
+    throw new Error(
+      `strict: expected ${expected} network activity rows in #${from}..#${to}, got ${blockActivityRows.length}. ` +
         `Missing ${missing.length}: [${missing.slice(0, 8).join(",")}${missing.length > 8 ? ",…" : ""}]`,
     );
   }
@@ -335,6 +370,11 @@ async function ingestRange(
     upsertAnalytics(analyticsRows),
     upsertMiningInfo(miningInfoRows),
     upsertCoinbaseRewards(coinbaseRewardRows),
+    upsertNetworkActivity({
+      blockActivity: blockActivityRows,
+      blockAddresses: blockAddressRows,
+      firstSeenAddresses: firstSeenRows,
+    }),
   ]);
   const highest = mergedBlocks[mergedBlocks.length - 1].number;
   await setCursor(highest, Math.min(highest, opts.safeHead));
@@ -344,6 +384,7 @@ async function ingestRange(
     sampled: sampledBlocks.length,
     miningInfo: miningInfoRows.length,
     coinbaseRewards: coinbaseRewardRows.length,
+    activityBlocks: blockActivityRows.length,
     dbWriteMs,
   };
 }
@@ -390,6 +431,9 @@ async function reorgCheck(lastIngested: number): Promise<void> {
       oldHash: divergeOld,
       newHash: divergeNew,
     });
+    await pool.query(`DELETE FROM address_first_seen WHERE first_seen_block >= $1`, [
+      divergeFrom,
+    ]);
     await pool.query(`DELETE FROM blocks WHERE block_number >= $1`, [
       divergeFrom,
     ]);
@@ -458,6 +502,7 @@ async function iterate(state: {
       sampled: s,
       miningInfo: mi,
       coinbaseRewards: cr,
+      activityBlocks: act,
       dbWriteMs,
     } = await ingestRange(from, to, {
       safeHead,
@@ -477,7 +522,7 @@ async function iterate(state: {
     const errorRate = state.errors / Math.max(state.iterations, 1);
     console.log(
       `[ingest] #${from}..#${to}  ${n} blocks  ${s} sampled  ${mi} mining_info  ` +
-        `${cr} coinbase_rewards  ` +
+        `${cr} coinbase_rewards  ${act} activity  ` +
         `${chunkElapsed.toFixed(1)}s  ${(n / Math.max(chunkElapsed, 0.001)).toFixed(0)}/s  ` +
         `db=${dbWriteMs}ms lag=${remaining.toLocaleString()} blocks  ETA ${(eta / 60).toFixed(0)}m  ` +
         `avg=${(state.blocksWritten / lifetimeMinutes).toFixed(0)} blocks/min errors=${state.errors}/${state.iterations} (${(errorRate * 100).toFixed(1)}%)`,
@@ -518,6 +563,7 @@ async function iterate(state: {
         blocks: n,
         miningInfo: mi,
         coinbaseRewards: cr,
+        activityBlocks: act,
         dbWriteMs,
       } = await ingestRange(from, to, {
         safeHead,
@@ -533,7 +579,7 @@ async function iterate(state: {
         const lifetimeMinutes = Math.max((Date.now() - state.startedAt) / 60_000, 0.001);
         const errorRate = state.errors / Math.max(state.iterations, 1);
         console.log(
-          `[ingest] tail: #${from}..#${to} (${n} blocks, ${mi} mining_info, ${cr} coinbase_rewards), ` +
+          `[ingest] tail: #${from}..#${to} (${n} blocks, ${mi} mining_info, ${cr} coinbase_rewards, ${act} activity), ` +
             `elapsed=${elapsed.toFixed(1)}s db=${dbWriteMs}ms lag=${lag} blocks ` +
             `avg=${(state.blocksWritten / lifetimeMinutes).toFixed(0)} blocks/min ` +
             `errors=${state.errors}/${state.iterations} (${(errorRate * 100).toFixed(1)}%), rollups updated`,

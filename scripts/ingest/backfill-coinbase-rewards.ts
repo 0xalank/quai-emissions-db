@@ -1,14 +1,26 @@
 #!/usr/bin/env tsx
-// Fill exact historical CoinbaseType outbound-ETX reward summaries.
+// Fill exact historical full-block summaries: CoinbaseType outbound-ETX reward
+// summaries plus network activity rows.
 //
 // The SOAP mining chart must not infer mined QUAI from sampled workshare counts.
 // go-quai emits actual CoinbaseType outbound ETXs on each block; those ETXs
 // carry token ledger, raw reward value, and lockup byte. This repair script
-// indexes those exact outputs for blocks already present in the local DB.
+// indexes those exact outputs for blocks already present in the local DB. The
+// same full-block RPC response also carries normal transactions and ETXs, so
+// this script backfills daily tx/address primitives for the Network page.
 
-import { walkCoinbaseRewardsByNums } from "../../lib/quai/coinbase-rewards";
+import { walkFullBlockSummariesByNums } from "../../lib/quai/coinbase-rewards";
 import { SOAP_ACTIVATION_DATE } from "../../lib/quai/protocol-constants";
-import { close, pool, upsertCoinbaseRewards } from "./db";
+import {
+  close,
+  pool,
+  upsertCoinbaseRewards,
+  upsertNetworkActivity,
+  type AddressFirstSeenRow,
+  type BlockActiveAddressRow,
+  type BlockActivityRow,
+  type CoinbaseRewardRow,
+} from "./db";
 import { runRollups } from "./rollup";
 
 type BlockNumberRow = { block_number: string };
@@ -33,6 +45,7 @@ const fromBlock = flag("from-block");
 const toBlock = flag("to-block");
 const overwrite = process.argv.includes("--all");
 const rebuildRollups = process.argv.includes("--rollup");
+const newestFirst = process.argv.includes("--newest-first");
 
 async function selectBatch(remaining: number): Promise<number[]> {
   const clauses: string[] = [];
@@ -54,7 +67,7 @@ async function selectBatch(remaining: number): Promise<number[]> {
     clauses.push(`b.block_number <= $${values.length}::bigint`);
   }
   if (!overwrite) {
-    clauses.push(`cr.block_number IS NULL`);
+    clauses.push(`(cr.block_number IS NULL OR ba.block_number IS NULL)`);
   }
 
   values.push(Math.min(chunkSize, remaining));
@@ -64,8 +77,9 @@ async function selectBatch(remaining: number): Promise<number[]> {
     `SELECT b.block_number::text
        FROM blocks b
        LEFT JOIN coinbase_rewards cr ON cr.block_number = b.block_number
+       LEFT JOIN block_activity ba ON ba.block_number = b.block_number
       WHERE ${clauses.join(" AND ")}
-      ORDER BY b.block_number ASC
+      ORDER BY b.block_number ${newestFirst ? "DESC" : "ASC"}
       LIMIT $${limitParam}`,
     values,
   );
@@ -75,8 +89,9 @@ async function selectBatch(remaining: number): Promise<number[]> {
 
 async function main() {
   console.log(
-    `[coinbase-rewards] from-date=${fromDate} to-date=${toDate ?? "latest"} ` +
-      `chunk=${chunkSize} limit=${limit === Number.MAX_SAFE_INTEGER ? "all" : limit} overwrite=${overwrite}`,
+    `[full-block-index] from-date=${fromDate} to-date=${toDate ?? "latest"} ` +
+      `chunk=${chunkSize} limit=${limit === Number.MAX_SAFE_INTEGER ? "all" : limit} ` +
+      `overwrite=${overwrite} newestFirst=${newestFirst}`,
   );
 
   let done = 0;
@@ -88,32 +103,50 @@ async function main() {
     const first = nums[0];
     const last = nums[nums.length - 1];
     const t0 = Date.now();
-    const rows = await walkCoinbaseRewardsByNums(nums);
-    if (rows.length !== nums.length) {
-      const got = new Set(rows.map((r) => r.block_number));
+    const summaries = await walkFullBlockSummariesByNums(nums);
+    if (summaries.length !== nums.length) {
+      const got = new Set(summaries.map((r) => r.coinbaseReward.block_number));
       const missing = nums.filter((n) => !got.has(n));
       throw new Error(
-        `RPC returned ${rows.length}/${nums.length} reward rows for #${first}..#${last}; missing ${missing.slice(0, 8).join(",")}`,
+        `RPC returned ${summaries.length}/${nums.length} full-block summaries for #${first}..#${last}; missing ${missing.slice(0, 8).join(",")}`,
       );
     }
 
-    await upsertCoinbaseRewards(rows);
-    done += rows.length;
+    const rewardRows: CoinbaseRewardRow[] = summaries.map(
+      (row) => row.coinbaseReward,
+    );
+    const blockActivityRows: BlockActivityRow[] = summaries.map(
+      (row) => row.activity.blockActivity,
+    );
+    const blockAddressRows: BlockActiveAddressRow[] = summaries.flatMap(
+      (row) => row.activity.blockAddresses,
+    );
+    const firstSeenRows: AddressFirstSeenRow[] = summaries.flatMap(
+      (row) => row.activity.firstSeenAddresses,
+    );
+
+    await upsertCoinbaseRewards(rewardRows);
+    await upsertNetworkActivity({
+      blockActivity: blockActivityRows,
+      blockAddresses: blockAddressRows,
+      firstSeenAddresses: firstSeenRows,
+    });
+    done += summaries.length;
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     const totalElapsed = (Date.now() - started) / 1000;
     const rate = done / Math.max(totalElapsed, 0.001);
     console.log(
-      `[coinbase-rewards] #${first}..#${last}: ${rows.length} blocks in ${elapsed}s; total=${done.toLocaleString()} avg=${rate.toFixed(1)}/s`,
+      `[full-block-index] #${first}..#${last}: ${summaries.length} blocks in ${elapsed}s; total=${done.toLocaleString()} avg=${rate.toFixed(1)}/s`,
     );
   }
 
   if (rebuildRollups) {
-    console.log("[coinbase-rewards] rebuilding rollups...");
+    console.log("[full-block-index] rebuilding rollups...");
     const res = await runRollups();
-    console.log(`[coinbase-rewards] rollups rebuilt: ${JSON.stringify(res)}`);
+    console.log(`[full-block-index] rollups rebuilt: ${JSON.stringify(res)}`);
   }
 
-  console.log(`[coinbase-rewards] done. indexed ${done.toLocaleString()} blocks`);
+  console.log(`[full-block-index] done. indexed ${done.toLocaleString()} blocks`);
 }
 
 main()

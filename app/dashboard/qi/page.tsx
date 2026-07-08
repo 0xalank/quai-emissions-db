@@ -4,6 +4,7 @@ import { QiConversionInfo } from "@/components/dashboard/qi/QiConversionInfo";
 import { QiExplainer } from "@/components/dashboard/qi/QiExplainer";
 import { QiHero } from "@/components/dashboard/qi/QiHero";
 import { QiImpliedPriceChart } from "@/components/dashboard/qi/QiImpliedPriceChart";
+import { QiMarketCapChart } from "@/components/dashboard/qi/QiMarketCapChart";
 import { QiRateChart } from "@/components/dashboard/qi/QiRateChart";
 import {
   TimeframeToggle,
@@ -41,6 +42,7 @@ export default function QiPage() {
       </div>
 
       <div className="fade-in-stagger space-y-4 sm:space-y-6">
+        <QiMarketCapChart from={from} to={to} />
         <QiImpliedPriceChart from={from} to={to} />
         <QiRateChart from={from} to={to} />
         <QiConversionInfo from={from} to={to} />

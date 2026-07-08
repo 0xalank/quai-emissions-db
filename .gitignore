@@ -8,6 +8,7 @@ out
 # build
 build
 dist
+.cache
 
 # typescript
 *.tsbuildinfo

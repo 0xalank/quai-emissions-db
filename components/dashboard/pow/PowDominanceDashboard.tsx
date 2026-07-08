@@ -455,18 +455,9 @@ export function PowDominanceDashboard() {
     };
 
     const histories = historyById(powMarketHistory?.rows);
-    const quotes = quoteById(powMarkets?.rows);
-    const fallbackDates = dateRangeIso(from, to);
     for (const network of POW_BENCHMARK_NETWORKS) {
       const historyRows = histories.get(network.coinGeckoId) ?? [];
       if (historyRows.length === 0) {
-        const fallbackPrice = quotes.get(network.coinGeckoId)?.usd ?? null;
-        if (fallbackPrice != null) {
-          for (const date of fallbackDates) {
-            const subsidy = dailySubsidyTokens(network, date);
-            ensureRow(date)[network.symbol] = subsidy * fallbackPrice;
-          }
-        }
         continue;
       }
       for (const row of historyRows) {
@@ -496,7 +487,7 @@ export function PowDominanceDashboard() {
         Object.entries(row).some(([key, value]) => key !== "date" && value != null),
       )
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  }, [powMarketHistory, powMarkets, from, to, qiMarket, rollups]);
+  }, [powMarketHistory, qiMarket, rollups]);
 
   const loading = rollupsLoading || powMarketsLoading || qiMarketLoading;
 
@@ -899,7 +890,7 @@ function SecurityBudgetLineChart({
         label to hide or show that network; the y-axis recalculates from the
         visible lines and selected scale.
         {historyErrors.length > 0
-          ? " Some historical series are temporarily using latest-price fallback because CoinGecko rate-limited the range endpoint."
+          ? " Some historical series are temporarily hidden because CoinGecko rate-limited the range endpoint."
           : ""}
       </p>
     </Card>
@@ -1034,7 +1025,7 @@ function SecurityCostsTable({
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 pr-4 font-mono">
+                  <td className="py-3 pr-4 tabular-nums">
                     <span
                       className={cn(
                         "inline-flex whitespace-nowrap rounded-md border px-2 py-1 text-xs",
@@ -1046,21 +1037,21 @@ function SecurityCostsTable({
                       {m.capacityTps.toLocaleString()} TPS
                     </span>
                   </td>
-                  <td className="py-3 pr-4 font-mono">
+                  <td className="py-3 pr-4 font-medium tabular-nums text-slate-900 dark:text-white">
                     {usd(m.dailySecurityCostUsd, true)}
                   </td>
-                  <td className="py-3 pr-4 font-mono">
+                  <td className="py-3 pr-4 font-medium tabular-nums text-slate-900 dark:text-white">
                     {usd(annualSpend, true)}
                   </td>
-                  <td className="py-3 pr-4 font-mono">
+                  <td className="py-3 pr-4 tabular-nums text-slate-900/80 dark:text-white/75">
                     {tokenAmount(m.dailySubsidy, m.symbol)}
                   </td>
-                  <td className="py-3 pr-4 font-mono">{usd(m.priceUsd)}</td>
-                  <td className="py-3 pr-4 font-mono">{ratio(ratioVsBtc)}</td>
-                  <td className="py-3 pr-4 font-mono">
+                  <td className="py-3 pr-4 tabular-nums text-slate-900/80 dark:text-white/75">{usd(m.priceUsd)}</td>
+                  <td className="py-3 pr-4 tabular-nums text-slate-900/80 dark:text-white/75">{ratio(ratioVsBtc)}</td>
+                  <td className="py-3 pr-4 tabular-nums text-slate-900/80 dark:text-white/75">
                     {pct(budgetShare, 3)}
                   </td>
-                  <td className="py-3 pr-4 font-mono">
+                  <td className="py-3 pr-4 tabular-nums text-slate-900/80 dark:text-white/75">
                     {usd(m.marketCapUsd, true)}
                   </td>
                 </tr>
@@ -1268,283 +1259,323 @@ function SoapUmbrellaCard({
     btcCost != null && bchCost != null && bchCost > 0
       ? btcCost / bchCost
       : null;
+  const currentExpanded =
+    quaiCost != null && addressableToday != null
+      ? quaiCost + addressableToday
+      : null;
+  const btcExpanded =
+    quaiCost != null && btcScalePool != null ? quaiCost + btcScalePool : null;
+  const nonShaSegments = segments.filter((m) => m.symbol !== "BCH");
+  const currentComponents = segments.map((m) => ({
+    key: m.symbol,
+    label: m.symbol,
+    value: m.dailySecurityCostUsd,
+    color: m.color,
+  }));
+  const btcComponents =
+    btcCost != null && btc != null
+      ? [
+          {
+            key: "BTC",
+            label: "BTC",
+            value: btcCost,
+            color: btc.color,
+          },
+          ...nonShaSegments.map((m) => ({
+            key: m.symbol,
+            label: m.symbol,
+            value: m.dailySecurityCostUsd,
+            color: m.color,
+          })),
+        ]
+      : [];
 
-  // One shared linear $/day scale across all three steps.
   const scaleMax = Math.max(
-    btcScalePool ?? 0,
-    addressableToday ?? 0,
+    btcExpanded ?? 0,
+    currentExpanded ?? 0,
     quaiCost ?? 0,
   );
-
-  const nonShaSegments = segments.filter((m) => m.symbol !== "BCH");
 
   return (
     <Card className={className}>
       <div className="chart-card-header">
-        <CardTitle>SOAP-addressable security</CardTitle>
-        <InfoPopover label="About SOAP-addressable security">
+        <CardTitle>SOAP security expansion</CardTitle>
+        <InfoPopover label="About SOAP security expansion">
           <p>
-            Three steps on one linear $/day scale. <em>QUAI today</em> is what
-            QUAI pays its own miners. <em>Addressable via SOAP</em> is the
-            reward spend already paid on chains whose work QUAI accepts: BCH
-            for SHA, LTC and DOGE for Scrypt, RVN for KawPoW.
-          </p>
-          <p className="mt-2">
-            <em>SHA at BTC scale</em> is an illustrative scenario, not current
-            hashpower: the same SOAP mechanics with the SHA leg anchored on
-            BTC instead of BCH. BTC contributes $0/day to the pool today.
+            Circle area is proportional to daily reward spend. BTC-scale SHA is
+            an illustrative scenario, not current QUAI hashpower.
           </p>
         </InfoPopover>
       </div>
 
-      <p className="mt-1 text-xs leading-5 text-slate-900/50 dark:text-white/50">
-        Where QUAI is today, what SOAP can tap now, and what the SHA leg looks
-        like at BTC scale.
-      </p>
-
-      <div className="mt-5 grid gap-5">
-        <SoapStep
-          step="1 · QUAI today"
-          chip={quaiCost != null ? "1x baseline" : null}
-          chipTone="slate"
-          value={quaiCost != null ? `${usd(quaiCost, true)}/day` : "—"}
-          description="Direct daily security spend — what QUAI currently pays its own miners (window average)."
-          segments={
-            quaiCost != null
-              ? [{ key: "QUAI", color: quai.color, value: quaiCost }]
-              : []
-          }
+      <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <SoapExpansionCircle
+          title="QUAI today"
+          totalLegendLabel="QUAI subsidy"
+          totalValue={quaiCost}
+          detail="Current SOAP subsidies shown"
+          outerColor={quai.color}
+          components={currentComponents}
           max={scaleMax}
+          baselineValue={quaiCost}
         />
 
-        <SoapStep
-          step="2 · Addressable via SOAP now"
-          chip={
+        <SoapExpansionCircle
+          title="Current SOAP reach"
+          totalLegendLabel="QUAI via SOAP"
+          totalValue={currentExpanded}
+          detail={
             addressableMultiple != null
-              ? `${formatMultiple(addressableMultiple)} QUAI today`
+              ? `${formatMultiple(addressableMultiple)} QUAI security`
               : null
           }
-          chipTone="emerald"
-          value={
-            addressableToday != null
-              ? `${usd(addressableToday, true)}/day`
-              : "—"
-          }
-          description="Rewards already paid on merge-mineable chains: BCH (SHA) + LTC & DOGE (Scrypt) + RVN (KawPoW)."
-          segments={segments.map((m) => ({
-            key: m.symbol,
-            color: m.color,
-            value: m.dailySecurityCostUsd ?? 0,
-          }))}
+          detailTone="emerald"
+          outerColor={quai.color}
+          components={currentComponents}
           max={scaleMax}
+          baselineValue={quaiCost}
         />
 
-        <SoapStep
-          step="3 · SHA leg at BTC scale"
-          chip={
+        <SoapExpansionCircle
+          title="BTC-scale SHA reach"
+          totalLegendLabel="BTC-scale SOAP"
+          totalValue={btcExpanded}
+          detail={
             btcScaleMultiple != null
-              ? `${formatMultiple(btcScaleMultiple)} QUAI today`
-              : null
+              ? `${formatMultiple(btcScaleMultiple)} QUAI security`
+              : shaJump != null
+                ? `BCH → BTC: ${formatMultiple(shaJump)}`
+                : null
           }
-          chipTone="amber"
-          value={btcScalePool != null ? `${usd(btcScalePool, true)}/day` : "—"}
-          description="Scenario: the same pool with the SHA anchor moved from BCH to BTC. Not current hashpower — the scale the mechanics point at."
-          segments={
-            btcCost != null && btc != null
-              ? [
-                  { key: "BTC", color: btc.color, value: btcCost },
-                  ...nonShaSegments.map((m) => ({
-                    key: m.symbol,
-                    color: m.color,
-                    value: m.dailySecurityCostUsd ?? 0,
-                  })),
-                ]
-              : []
-          }
+          detailTone="amber"
+          outerColor={quai.color}
+          components={btcComponents}
           max={scaleMax}
+          baselineValue={quaiCost}
         />
       </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="rounded-md border border-slate-900/10 p-3 dark:border-white/10">
-          <div className="text-xs uppercase tracking-wider text-slate-900/45 dark:text-white/45">
-            Addressable today, by network
-          </div>
-          <div className="mt-2.5 grid gap-1.5">
-            {segments.map((m) => {
-              const share =
-                m.dailySecurityCostUsd == null ||
-                addressableToday == null ||
-                addressableToday <= 0
-                  ? null
-                  : (m.dailySecurityCostUsd / addressableToday) * 100;
-              return (
-                <div
-                  key={m.symbol}
-                  className="flex items-center justify-between gap-3 text-sm"
-                >
-                  <span className="flex items-center gap-2 text-slate-900/70 dark:text-white/65">
-                    <span
-                      aria-hidden
-                      className="h-2 w-2 shrink-0 rounded-sm"
-                      style={{ background: m.color }}
-                    />
-                    {m.label}
-                    <span className="text-xs text-slate-900/40 dark:text-white/40">
-                      {m.algorithm}
-                    </span>
-                  </span>
-                  <span className="font-mono text-slate-900 dark:text-white">
-                    {usd(m.dailySecurityCostUsd, true)}
-                    <span className="ml-2 text-xs text-slate-900/45 dark:text-white/45">
-                      {pct(share, 1)}
-                    </span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-md border border-amber-500/20 bg-amber-500/[0.05] p-3">
-          <div className="text-xs uppercase tracking-wider text-amber-700 dark:text-amber-300">
-            The SHA leg: BCH → BTC
-          </div>
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-            <span className="inline-flex items-center gap-2">
-              <span
-                aria-hidden
-                className="h-2 w-2 rounded-sm"
-                style={{ background: bch?.color ?? "#8dc351" }}
-              />
-              <span className="text-slate-900/70 dark:text-white/65">
-                BCH
-              </span>
-              <span className="font-mono text-slate-900 dark:text-white">
-                {usd(bchCost, true)}/day
-              </span>
-            </span>
-            <span
-              aria-hidden
-              className="font-mono text-xs text-amber-700 dark:text-amber-300"
-            >
-              ─{shaJump != null ? ` ${formatMultiple(shaJump)} ` : "─"}→
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span
-                aria-hidden
-                className="h-2 w-2 rounded-sm"
-                style={{ background: btc?.color ?? "#f7931a" }}
-              />
-              <span className="text-slate-900/70 dark:text-white/65">
-                BTC
-              </span>
-              <span className="font-mono text-slate-900 dark:text-white">
-                {usd(btcCost, true)}/day
-              </span>
-            </span>
-          </div>
-          <p className="mt-2 text-xs leading-5 text-slate-900/55 dark:text-white/55">
-            Same SHA-256 work. Anchoring the SHA leg on BTC instead of BCH
-            multiplies that leg{" "}
-            {shaJump != null ? (
-              <span className="font-mono text-amber-700 dark:text-amber-300">
-                {formatMultiple(shaJump)}
-              </span>
-            ) : (
-              "—"
-            )}{" "}
-            — from a rounding error next to DOGE to the dominant share of the
-            pool.
-          </p>
-        </div>
-      </div>
-
-      <p className="mt-4 text-xs leading-5 text-slate-900/50 dark:text-white/50">
-        All three bars share one linear $/day scale, so the steps are directly
-        comparable. Step 3 is a scenario — BTC miners do not currently point
-        hashpower at QUAI, and the table above still shows BTC as the
-        benchmark security budget.
-      </p>
     </Card>
   );
 }
 
-function SoapStep({
-  step,
-  chip,
-  chipTone = "slate",
-  value,
-  description,
-  segments,
+type SoapComponentCircle = {
+  key: string;
+  label: string;
+  value: number | null;
+  color: string;
+};
+
+type PackedSoapCircle = SoapComponentCircle & {
+  x: number;
+  y: number;
+  r: number;
+};
+
+function SoapExpansionCircle({
+  title,
+  totalLegendLabel,
+  totalValue,
+  detail,
+  detailTone = "muted",
+  outerColor,
+  components,
   max,
+  baselineValue,
 }: {
-  step: string;
-  chip: string | null;
-  chipTone?: "slate" | "emerald" | "amber";
-  value: string;
-  description: string;
-  segments: { key: string; color: string; value: number }[];
+  title: string;
+  totalLegendLabel: string;
+  totalValue: number | null;
+  detail: string | null;
+  detailTone?: "muted" | "emerald" | "amber";
+  outerColor: string;
+  components: SoapComponentCircle[];
   max: number;
+  baselineValue: number | null;
 }) {
-  const total = segments.reduce((acc, s) => acc + s.value, 0);
-  // Keep even the smallest step visible as a sliver on the shared scale.
-  const fillPct =
-    max > 0 && total > 0 ? Math.max((total / max) * 100, 0.35) : 0;
+  const outerRadius = (value: number | null): number => {
+    if (value == null || value <= 0) return 0;
+    const baseline =
+      baselineValue != null && baselineValue > 0 ? baselineValue : value;
+    const maxRatio = max > baseline ? max / baseline : 1;
+    const ratio = Math.max(1, value / baseline);
+    if (maxRatio <= 1) return 54;
+    const normalized = Math.log(ratio) / Math.log(maxRatio);
+    return Math.max(34, Math.min(86, 36 + normalized * 50));
+  };
+  const innerRadius = (value: number | null): number => {
+    if (value == null || value <= 0 || totalValue == null || totalValue <= 0) {
+      return 0;
+    }
+    return Math.max(8, Math.sqrt(value / totalValue) * totalRadius * 0.92);
+  };
+  const totalRadius = outerRadius(totalValue);
+  const packedComponents = packSoapCircles(
+    components
+      .map((component) => ({
+        ...component,
+        r: innerRadius(component.value),
+      }))
+      .filter((component) => component.r > 0),
+    totalRadius,
+  );
+  const legendItems: SoapComponentCircle[] = [
+    {
+      key: "total",
+      label: totalLegendLabel,
+      value: totalValue,
+      color: outerColor,
+    },
+    ...components,
+  ];
 
   return (
-    <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <div className="flex items-center gap-2">
-          <span className="text-[0.68rem] font-semibold uppercase tracking-wider text-slate-900/55 dark:text-white/55">
-            {step}
-          </span>
-          {chip != null && (
-            <span
+    <div className="rounded-md border border-slate-900/10 p-3 dark:border-white/10">
+      <div className="flex items-start gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wider text-slate-900/55 dark:text-white/55">
+          {title}
+        </div>
+      </div>
+
+      <div className="relative mt-2 flex flex-col items-center">
+        <div className="pointer-events-none absolute left-0 top-0 z-10 space-y-1">
+          {legendItems.map((item) => (
+            <div
+              key={item.key}
+              className="flex items-baseline gap-1.5 text-[11px] leading-none"
+            >
+              <span
+                aria-hidden
+                className="mt-[1px] h-2 w-2 shrink-0 rounded-full"
+                style={{ background: item.color }}
+              />
+              <span className="font-semibold text-slate-950 dark:text-white">
+                {item.label}
+              </span>
+              <span className="font-medium tabular-nums text-slate-900/58 dark:text-white/58">
+                {usd(item.value, true)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <svg
+          viewBox="0 0 200 200"
+          className="h-[220px] w-full max-w-[250px] overflow-visible"
+          aria-hidden
+        >
+          {totalRadius > 0 && (
+            <circle
+              cx="100"
+              cy="100"
+              r={totalRadius}
+              fill={outerColor}
+              fillOpacity="0.10"
+              stroke={outerColor}
+              strokeWidth="3"
+            />
+          )}
+          {packedComponents.map((component) => (
+            <g key={component.key}>
+              <circle
+                cx={component.x}
+                cy={component.y}
+                r={component.r}
+                fill={component.color}
+                fillOpacity="0.30"
+                stroke={component.color}
+                strokeWidth="2"
+              />
+            </g>
+          ))}
+        </svg>
+
+        <div className="mt-1 min-h-[1.25rem] text-center">
+          {detail != null && (
+            <div
               className={cn(
-                "rounded-full border px-1.5 py-0.5 font-mono text-[0.68rem]",
-                chipTone === "emerald" &&
-                  "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-                chipTone === "amber" &&
-                  "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-                chipTone === "slate" &&
-                  "border-slate-900/15 bg-slate-900/[0.04] text-slate-900/60 dark:border-white/15 dark:bg-white/[0.06] dark:text-white/60",
+                "mt-0.5 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold tabular-nums",
+                detailTone === "emerald"
+                  ? "border-emerald-500/30 bg-emerald-500/[0.10] text-emerald-700 dark:text-emerald-300"
+                  : detailTone === "amber"
+                    ? "border-amber-500/35 bg-amber-500/[0.10] text-amber-700 dark:text-amber-300"
+                    : "border-slate-900/10 bg-slate-900/[0.03] text-slate-900/55 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/55",
               )}
             >
-              {chip}
-            </span>
+              {detail}
+            </div>
           )}
         </div>
-        <span className="font-mono text-sm text-slate-900 dark:text-white">
-          {value}
-        </span>
       </div>
-
-      <div className="mt-1.5 h-4 w-full rounded-full bg-slate-900/[0.04] dark:bg-white/[0.06]">
-        {fillPct > 0 && (
-          <div
-            className="flex h-full gap-[2px] overflow-hidden rounded-full"
-            style={{ width: `${fillPct}%`, minWidth: "4px" }}
-          >
-            {segments.map((s) => (
-              <div
-                key={s.key}
-                style={{
-                  width: total > 0 ? `${(s.value / total) * 100}%` : "100%",
-                  minWidth: "2px",
-                  background: s.color,
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <p className="mt-1.5 text-xs leading-5 text-slate-900/55 dark:text-white/55">
-        {description}
-      </p>
     </div>
   );
+}
+
+function packSoapCircles(
+  circles: Array<SoapComponentCircle & { r: number }>,
+  containerRadius: number,
+): PackedSoapCircle[] {
+  if (circles.length === 0 || containerRadius <= 0) return [];
+
+  const padding = 3;
+  const placed: Array<SoapComponentCircle & { r: number; px: number; py: number }> = [];
+  const sorted = [...circles].sort((a, b) => b.r - a.r);
+
+  for (const circle of sorted) {
+    if (placed.length === 0) {
+      placed.push({ ...circle, px: 0, py: 0 });
+      continue;
+    }
+
+    let best: { x: number; y: number; score: number } | null = null;
+    const maxSearch = sorted.reduce((sum, item) => sum + item.r + padding, circle.r);
+
+    for (let distance = 0; distance <= maxSearch && best == null; distance += 3) {
+      for (let degrees = 0; degrees < 360; degrees += 8) {
+        const radians = (degrees * Math.PI) / 180;
+        const x = Math.cos(radians) * distance;
+        const y = Math.sin(radians) * distance;
+        const overlaps = placed.some((other) => {
+          const dx = x - other.px;
+          const dy = y - other.py;
+          return Math.hypot(dx, dy) < circle.r + other.r + padding;
+        });
+
+        if (!overlaps) {
+          const score = Math.hypot(x, y);
+          if (best == null || score < best.score) {
+            best = { x, y, score };
+          }
+        }
+      }
+    }
+
+    placed.push({
+      ...circle,
+      px: best?.x ?? 0,
+      py: best?.y ?? 0,
+    });
+  }
+
+  const minX = Math.min(...placed.map((circle) => circle.px - circle.r));
+  const maxX = Math.max(...placed.map((circle) => circle.px + circle.r));
+  const minY = Math.min(...placed.map((circle) => circle.py - circle.r));
+  const maxY = Math.max(...placed.map((circle) => circle.py + circle.r));
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  const packedRadius = Math.max(
+    ...placed.map((circle) =>
+      Math.hypot(circle.px - centerX, circle.py - centerY) + circle.r,
+    ),
+  );
+  const scale =
+    packedRadius > 0 ? Math.min(1, Math.max(0, containerRadius - 8) / packedRadius) : 1;
+
+  return placed.map(({ px, py, ...circle }) => ({
+    ...circle,
+    x: 100 + (px - centerX) * scale,
+    y: 100 + (py - centerY) * scale,
+    r: circle.r * scale,
+  }));
 }
 
 function PowEfficiencyCard({

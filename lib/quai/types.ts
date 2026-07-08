@@ -258,6 +258,26 @@ export type QiMarketRow = {
   quaiPriceClose: string | null;
 };
 
+export type NetworkStatsRow = {
+  periodStart: string;
+  firstBlock: number;
+  lastBlock: number;
+  blockCount: number;
+  partial: boolean;
+  txCount: number;
+  activeAddresses: number;
+  newAddresses: number;
+  cumulativeAddresses: number;
+  burnDelta: bigint;
+  burnClose: bigint;
+  coinbaseQuaiLockedRewardSum: bigint;
+  coinbaseRewardIndexedCount: number;
+  kawpowHashrateAvg: bigint | null;
+  shaHashrateAvg: bigint | null;
+  scryptHashrateAvg: bigint | null;
+  miningBlockCount: number | null;
+};
+
 export type GrainMeta = {
   rows: number;
   earliestPeriod: string | null;

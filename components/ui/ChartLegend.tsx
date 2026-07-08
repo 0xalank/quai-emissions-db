@@ -6,6 +6,7 @@ export type ChartLegendItem = {
   color: string;
   /** Optional dasharray hint — renders the dot as a dashed line if set. */
   dasharray?: string;
+  swatchClassName?: string;
 };
 
 // ChartLegend — pill-row legend rendered ABOVE the chart container, not
@@ -27,7 +28,7 @@ export function ChartLegend({
       {items.map((item) => (
         <span
           key={item.label}
-          className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/[0.04] px-1.5 py-0.5 text-[0.68rem] text-slate-700 dark:bg-white/[0.06] dark:text-white/70 sm:px-2 sm:text-xs"
+          className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/[0.04] px-1.5 py-0.5 text-[0.68rem] font-medium text-slate-700 dark:bg-white/[0.06] dark:text-white/70 sm:px-2 sm:text-xs"
         >
           {item.dasharray ? (
             <svg
@@ -50,7 +51,10 @@ export function ChartLegend({
           ) : (
             <span
               aria-hidden
-              className="inline-block h-2 w-2 shrink-0 rounded-sm"
+              className={cn(
+                "inline-block h-2 w-2 shrink-0 rounded-sm",
+                item.swatchClassName,
+              )}
               style={{ background: item.color }}
             />
           )}

@@ -8,6 +8,7 @@ import type {
 } from "@/lib/comparisons/pow-dominance";
 import type {
   MiningInfo,
+  NetworkStatsRow,
   Period,
   QiMarketRow,
   Rollup,
@@ -223,6 +224,26 @@ export function useQiMarket(args: { from: string; to: string }) {
       if (!res.ok) throw new Error(`qi ${res.status}`);
       const raw = (await res.json()) as { period: string; rows: unknown };
       return reviveBig<QiMarketRow[]>(raw.rows);
+    },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Hook for /api/network. Daily rows combine transaction/address activity with
+ * selected mining and SOAP rollup metrics. */
+export function useNetworkStats(args: { from: string; to: string }) {
+  return useQuery<NetworkStatsRow[]>({
+    queryKey: ["network-stats", args.from, args.to],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/network?period=day&from=${args.from}&to=${args.to}`,
+      );
+      if (!res.ok) throw new Error(`network ${res.status}`);
+      const raw = (await res.json()) as { period: string; rows: unknown };
+      return reviveBig<NetworkStatsRow[]>(raw.rows);
     },
     staleTime: 60_000,
     refetchInterval: 60_000,

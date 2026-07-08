@@ -377,6 +377,157 @@ export async function upsertCoinbaseRewards(
   }
 }
 
+// ── network activity upsert ──────────────────────────────────────────────
+
+export type BlockActivityRow = {
+  block_number: number;
+  tx_count: number;
+};
+
+export type BlockActiveAddressRow = {
+  block_number: number;
+  address: string;
+};
+
+export type AddressFirstSeenRow = {
+  address: string;
+  first_seen_block: number;
+  first_seen_ts: number;
+};
+
+const BLOCK_ACTIVITY_PARAMS_PER_ROW = 2;
+
+async function upsertBlockActivityChunk(
+  rows: BlockActivityRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const values: unknown[] = [];
+  const placeholders: string[] = [];
+  let i = 1;
+  for (const r of rows) {
+    placeholders.push(`($${i},$${i + 1})`);
+    values.push(r.block_number, r.tx_count);
+    i += BLOCK_ACTIVITY_PARAMS_PER_ROW;
+  }
+
+  await pool.query(
+    `INSERT INTO block_activity (block_number, tx_count)
+     VALUES ${placeholders.join(",")}
+     ON CONFLICT (block_number) DO UPDATE SET
+       tx_count   = EXCLUDED.tx_count,
+       indexed_at = now()`,
+    values,
+  );
+}
+
+const BLOCK_ACTIVE_ADDRESS_PARAMS_PER_ROW = 2;
+
+async function replaceBlockActiveAddressesChunk(
+  client: PoolClient,
+  rows: BlockActiveAddressRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const values: unknown[] = [];
+  const placeholders: string[] = [];
+  let i = 1;
+  for (const r of rows) {
+    placeholders.push(`($${i},$${i + 1})`);
+    values.push(r.block_number, hexToBytea(r.address));
+    i += BLOCK_ACTIVE_ADDRESS_PARAMS_PER_ROW;
+  }
+
+  await client.query(
+    `INSERT INTO block_active_addresses (block_number, address)
+     VALUES ${placeholders.join(",")}
+     ON CONFLICT (block_number, address) DO NOTHING`,
+    values,
+  );
+}
+
+const ADDRESS_FIRST_SEEN_PARAMS_PER_ROW = 3;
+
+async function upsertAddressFirstSeenRows(
+  rows: AddressFirstSeenRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const deduped = new Map<string, AddressFirstSeenRow>();
+  for (const row of rows) {
+    const prev = deduped.get(row.address);
+    if (!prev || row.first_seen_block < prev.first_seen_block) {
+      deduped.set(row.address, row);
+    }
+  }
+
+  const compactRows = [...deduped.values()];
+  const max = maxRowsPerStmt(ADDRESS_FIRST_SEEN_PARAMS_PER_ROW);
+  for (let offset = 0; offset < compactRows.length; offset += max) {
+    const chunk = compactRows.slice(offset, offset + max);
+    const values: unknown[] = [];
+    const placeholders: string[] = [];
+    let i = 1;
+    for (const r of chunk) {
+      placeholders.push(
+        `($${i},$${i + 1},(to_timestamp($${i + 2}) AT TIME ZONE 'UTC')::date,to_timestamp($${i + 2}))`,
+      );
+      values.push(hexToBytea(r.address), r.first_seen_block, r.first_seen_ts);
+      i += ADDRESS_FIRST_SEEN_PARAMS_PER_ROW;
+    }
+    await pool.query(
+      `INSERT INTO address_first_seen
+         (address, first_seen_block, first_seen_date, first_seen_at)
+       VALUES ${placeholders.join(",")}
+       ON CONFLICT (address) DO UPDATE SET
+         first_seen_block = EXCLUDED.first_seen_block,
+         first_seen_date  = EXCLUDED.first_seen_date,
+         first_seen_at    = EXCLUDED.first_seen_at
+       WHERE EXCLUDED.first_seen_block < address_first_seen.first_seen_block
+          OR NOT EXISTS (
+            SELECT 1 FROM blocks b
+            WHERE b.block_number = address_first_seen.first_seen_block
+          )`,
+      values,
+    );
+  }
+}
+
+export async function upsertNetworkActivity(args: {
+  blockActivity: BlockActivityRow[];
+  blockAddresses: BlockActiveAddressRow[];
+  firstSeenAddresses: AddressFirstSeenRow[];
+}): Promise<void> {
+  const maxActivity = maxRowsPerStmt(BLOCK_ACTIVITY_PARAMS_PER_ROW);
+  for (let i = 0; i < args.blockActivity.length; i += maxActivity) {
+    await upsertBlockActivityChunk(args.blockActivity.slice(i, i + maxActivity));
+  }
+
+  const blockNumbers = [...new Set(args.blockActivity.map((r) => r.block_number))];
+  if (blockNumbers.length > 0) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `DELETE FROM block_active_addresses WHERE block_number = ANY($1::bigint[])`,
+        [blockNumbers],
+      );
+      const maxAddresses = maxRowsPerStmt(BLOCK_ACTIVE_ADDRESS_PARAMS_PER_ROW);
+      for (let i = 0; i < args.blockAddresses.length; i += maxAddresses) {
+        await replaceBlockActiveAddressesChunk(
+          client,
+          args.blockAddresses.slice(i, i + maxAddresses),
+        );
+      }
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  await upsertAddressFirstSeenRows(args.firstSeenAddresses);
+}
+
 // ── market_prices_daily / qi_daily_quotes upserts ───────────────────────
 
 export type MarketPriceDailyRow = {

@@ -32,11 +32,59 @@ export type CoinbaseRewardRow = {
   qi_coinbase_etx_count: number;
 };
 
+export type BlockActivityRow = {
+  block_number: number;
+  tx_count: number;
+};
+
+export type BlockActiveAddressRow = {
+  block_number: number;
+  address: string;
+};
+
+export type AddressFirstSeenRow = {
+  address: string;
+  first_seen_block: number;
+  first_seen_ts: number;
+};
+
+export type BlockActivitySummary = {
+  blockActivity: BlockActivityRow;
+  blockAddresses: BlockActiveAddressRow[];
+  firstSeenAddresses: AddressFirstSeenRow[];
+};
+
+export type FullBlockSummary = {
+  coinbaseReward: CoinbaseRewardRow;
+  activity: BlockActivitySummary;
+};
+
 const hexToBig = (h?: string): bigint =>
   h && h.startsWith("0x") ? BigInt(h) : 0n;
 
 const hexToNum = (h?: string): number =>
   h && h.startsWith("0x") ? Number(BigInt(h)) : 0;
+
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+
+type RawTxLike =
+  | string
+  | {
+      blockNumber?: string;
+      etxType?: string;
+      from?: string;
+      sender?: string;
+      origin?: string;
+      to?: string;
+      value?: string;
+    };
+
+type RawActivityBlock = {
+  woHeader?: { number?: string; timestamp?: string };
+  transactions?: RawTxLike[];
+  inboundEtxs?: RawTxLike[];
+  outboundEtxs?: RawTxLike[];
+};
 
 function safeIsQiAddress(address?: string): boolean {
   if (!address) return false;
@@ -98,6 +146,74 @@ export function coinbaseRewardsFromBlock(
   };
 }
 
+function normalizeAddress(address?: string): string | null {
+  if (!address || !ADDRESS_RE.test(address)) return null;
+  return address.toLowerCase();
+}
+
+function addressCandidates(tx: Exclude<RawTxLike, string>): string[] {
+  const out: string[] = [];
+  const from = normalizeAddress(tx.from ?? tx.sender ?? tx.origin);
+  const to = normalizeAddress(tx.to);
+  if (from) out.push(from);
+  if (to) out.push(to);
+  return out;
+}
+
+function isCoinbaseEtx(tx: RawTxLike): boolean {
+  return typeof tx !== "string" && hexToNum(tx.etxType) === COINBASE_ETX_TYPE;
+}
+
+export function blockActivityFromBlock(
+  fallbackBlockNumber: number,
+  block: RawActivityBlock,
+): BlockActivitySummary {
+  const blockNumber = hexToNum(block.woHeader?.number) || fallbackBlockNumber;
+  const timestamp = hexToNum(block.woHeader?.timestamp);
+  const addresses = new Set<string>();
+  let txCount = 0;
+
+  const collections = [
+    block.transactions ?? [],
+    block.inboundEtxs ?? [],
+    block.outboundEtxs ?? [],
+  ];
+
+  for (const txs of collections) {
+    for (const tx of txs) {
+      if (isCoinbaseEtx(tx)) continue;
+      txCount++;
+      if (typeof tx === "string") continue;
+      for (const address of addressCandidates(tx)) addresses.add(address);
+    }
+  }
+
+  const blockAddresses = [...addresses].map((address) => ({
+    block_number: blockNumber,
+    address,
+  }));
+
+  return {
+    blockActivity: { block_number: blockNumber, tx_count: txCount },
+    blockAddresses,
+    firstSeenAddresses: blockAddresses.map(({ address }) => ({
+      address,
+      first_seen_block: blockNumber,
+      first_seen_ts: timestamp,
+    })),
+  };
+}
+
+function summarizeFullBlock(
+  fallbackBlockNumber: number,
+  block: RawFullBlock & RawActivityBlock,
+): FullBlockSummary {
+  return {
+    coinbaseReward: coinbaseRewardsFromBlock(fallbackBlockNumber, block),
+    activity: blockActivityFromBlock(fallbackBlockNumber, block),
+  };
+}
+
 async function batchGetCoinbaseRewards(
   blockNumbers: number[],
   signal?: AbortSignal,
@@ -130,6 +246,43 @@ async function batchGetCoinbaseRewards(
     if (row && row.result && typeof row.id === "number") {
       const fallback = blockNumbers[row.id];
       out.set(fallback, coinbaseRewardsFromBlock(fallback, row.result));
+    }
+  }
+  return out;
+}
+
+async function batchGetFullBlockSummaries(
+  blockNumbers: number[],
+  signal?: AbortSignal,
+): Promise<Map<number, FullBlockSummary>> {
+  if (blockNumbers.length === 0) return new Map();
+  const payload = blockNumbers.map((n, i) => ({
+    jsonrpc: "2.0",
+    id: i,
+    method: "quai_getBlockByNumber",
+    params: ["0x" + n.toString(16), true],
+  }));
+
+  const res = await fetch(ZONE_RPC, {
+    method: "POST",
+    signal,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`batch full block summaries ${res.status}`);
+  const raw = await res.json();
+  if (!Array.isArray(raw)) {
+    throw new Error(
+      `batch full block summaries non-array response: ${JSON.stringify(raw).slice(0, 160)}`,
+    );
+  }
+
+  const out = new Map<number, FullBlockSummary>();
+  for (const row of raw as BatchResp<RawFullBlock & RawActivityBlock>[]) {
+    if (row && row.result && typeof row.id === "number") {
+      const fallback = blockNumbers[row.id];
+      out.set(fallback, summarizeFullBlock(fallback, row.result));
     }
   }
   return out;
@@ -189,6 +342,67 @@ export async function walkCoinbaseRewardsByNums(
   await Promise.all(workers);
 
   const out: CoinbaseRewardRow[] = [];
+  for (const n of blockNumbers) {
+    const row = result.get(n);
+    if (row) out.push(row);
+  }
+  return out;
+}
+
+export async function walkFullBlockSummariesByNums(
+  blockNumbers: number[],
+  signal?: AbortSignal,
+): Promise<FullBlockSummary[]> {
+  if (blockNumbers.length === 0) return [];
+  const chunks: number[][] = [];
+  for (let i = 0; i < blockNumbers.length; i += FULL_BLOCK_BATCH_SIZE) {
+    chunks.push(blockNumbers.slice(i, i + FULL_BLOCK_BATCH_SIZE));
+  }
+
+  const result = new Map<number, FullBlockSummary>();
+
+  async function fetchWithRetry(nums: number[], depth = 0): Promise<void> {
+    try {
+      const m = await batchGetFullBlockSummaries(nums, signal);
+      for (const [k, v] of m) result.set(k, v);
+      if (m.size < nums.length && depth < 2) {
+        const missing = nums.filter((n) => !m.has(n));
+        if (missing.length > 0) {
+          const half = Math.max(1, Math.floor(missing.length / 2));
+          await Promise.all([
+            fetchWithRetry(missing.slice(0, half), depth + 1),
+            fetchWithRetry(missing.slice(half), depth + 1),
+          ]);
+        }
+      }
+    } catch (e) {
+      if (depth < 2 && nums.length > 1) {
+        const half = Math.max(1, Math.floor(nums.length / 2));
+        await Promise.all([
+          fetchWithRetry(nums.slice(0, half), depth + 1),
+          fetchWithRetry(nums.slice(half), depth + 1),
+        ]);
+      } else {
+        console.warn(`[full-block-summaries] final failure for ${nums.length} blocks`, e);
+      }
+    }
+  }
+
+  let idx = 0;
+  const worker = async () => {
+    while (true) {
+      const i = idx++;
+      if (i >= chunks.length) break;
+      await fetchWithRetry(chunks[i]);
+    }
+  };
+  const workers = Array.from(
+    { length: Math.min(RPC_BATCH_PARALLELISM, chunks.length) || 1 },
+    () => worker(),
+  );
+  await Promise.all(workers);
+
+  const out: FullBlockSummary[] = [];
   for (const n of blockNumbers) {
     const row = result.get(n);
     if (row) out.push(row);
