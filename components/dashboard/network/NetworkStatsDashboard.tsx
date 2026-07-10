@@ -102,6 +102,14 @@ function latestRow(rows: NetworkStatsRow[] | undefined): NetworkStatsRow | null 
   return null;
 }
 
+function completeTrendRows(
+  rows: NetworkStatsRow[] | undefined,
+): NetworkStatsRow[] | undefined {
+  if (!rows || rows.length <= 1) return rows;
+  const latest = rows[rows.length - 1];
+  return latest.partial ? rows.slice(0, -1) : rows;
+}
+
 function firstMeaningfulRow(
   rows: NetworkStatsRow[] | undefined,
   getter: (row: NetworkStatsRow) => number | null,
@@ -306,9 +314,10 @@ function HashrateTrendChart({
   to: string;
 }) {
   const compact = useCompactViewport();
+  const trendRows = useMemo(() => completeTrendRows(rows), [rows]);
   const chartData = useMemo(
     () =>
-      rows?.map((r) => ({
+      trendRows?.map((r) => ({
         date: r.periodStart,
         kawpow:
           r.kawpowHashrateAvg == null ? null : Number(r.kawpowHashrateAvg),
@@ -316,7 +325,7 @@ function HashrateTrendChart({
         scrypt:
           r.scryptHashrateAvg == null ? null : Number(r.scryptHashrateAvg),
       })) ?? [],
-    [rows],
+    [trendRows],
   );
   const status = chartStatus({ rows, loading, error });
   const domains = useMemo(() => {
@@ -491,14 +500,15 @@ function ActivityTrendChart({
   to: string;
 }) {
   const compact = useCompactViewport();
+  const trendRows = useMemo(() => completeTrendRows(rows), [rows]);
   const chartData = useMemo(
     () =>
-      rows?.map((r) => ({
+      trendRows?.map((r) => ({
         date: r.periodStart,
         txs: r.txCount,
         active: r.activeAddresses,
       })) ?? [],
-    [rows],
+    [trendRows],
   );
   const status = chartStatus({ rows, loading, error });
 
@@ -558,14 +568,15 @@ function WalletGrowthChart({
   to: string;
 }) {
   const compact = useCompactViewport();
+  const trendRows = useMemo(() => completeTrendRows(rows), [rows]);
   const chartData = useMemo(
     () =>
-      rows?.map((r) => ({
+      trendRows?.map((r) => ({
         date: r.periodStart,
         wallets: r.cumulativeAddresses,
         newWallets: r.newAddresses,
       })) ?? [],
-    [rows],
+    [trendRows],
   );
   const status = chartStatus({ rows, loading, error });
 

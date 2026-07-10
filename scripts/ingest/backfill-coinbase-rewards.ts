@@ -73,18 +73,25 @@ async function selectBatch(remaining: number): Promise<number[]> {
   values.push(Math.min(chunkSize, remaining));
   const limitParam = values.length;
 
-  const { rows } = await pool.query<BlockNumberRow>(
-    `SELECT b.block_number::text
-       FROM blocks b
-       LEFT JOIN coinbase_rewards cr ON cr.block_number = b.block_number
-       LEFT JOIN block_activity ba ON ba.block_number = b.block_number
-      WHERE ${clauses.join(" AND ")}
-      ORDER BY b.block_number ${newestFirst ? "DESC" : "ASC"}
-      LIMIT $${limitParam}`,
-    values,
-  );
+  const client = await pool.connect();
+  try {
+    await client.query("SET max_parallel_workers_per_gather = 0");
+    const { rows } = await client.query<BlockNumberRow>(
+      `SELECT b.block_number::text
+         FROM blocks b
+         LEFT JOIN coinbase_rewards cr ON cr.block_number = b.block_number
+         LEFT JOIN block_activity ba ON ba.block_number = b.block_number
+        WHERE ${clauses.join(" AND ")}
+        ORDER BY b.block_number ${newestFirst ? "DESC" : "ASC"}
+        LIMIT $${limitParam}`,
+      values,
+    );
 
-  return rows.map((r) => Number(r.block_number));
+    return rows.map((r) => Number(r.block_number));
+  } finally {
+    await client.query("RESET max_parallel_workers_per_gather").catch(() => {});
+    client.release();
+  }
 }
 
 async function main() {
