@@ -7,6 +7,7 @@ import {
 } from "@/lib/quai/miningpoolstats";
 import {
   fetchIndexedSoapParentBlocks,
+  fetchIndexedMiningPoolStatsParticipantCounts,
   parseMiningPoolStatsBlockLimit,
 } from "@/lib/quai/miningpoolstats-server";
 
@@ -28,12 +29,18 @@ export async function GET(
     }
 
     const blockLimit = parseMiningPoolStatsBlockLimit(new URL(req.url));
-    const [info, parentBlocks] = await Promise.all([
+    const [info, parentBlocks, participantCounts] = await Promise.all([
       fetchMiningInfo(),
       fetchIndexedSoapParentBlocks(config, blockLimit),
+      fetchIndexedMiningPoolStatsParticipantCounts(config.algoKey),
     ]);
     return NextResponse.json(
-      buildMiningPoolStatsPoolPayload({ info, config, parentBlocks }),
+      buildMiningPoolStatsPoolPayload({
+        info,
+        config,
+        parentBlocks,
+        participantCounts,
+      }),
       {
         headers: {
           "cache-control": "s-maxage=60, stale-while-revalidate=300",

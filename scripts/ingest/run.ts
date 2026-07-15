@@ -69,6 +69,7 @@ import {
 import { runRollups } from "./rollup";
 import { syncQiMarketData } from "./qi-market";
 import { syncSoapParentBlocks } from "./soap-parent-blocks";
+import { syncMiningPoolStatsParticipantCounts } from "./miningpoolstats-directory";
 import type { NormalizedBlock } from "../../lib/quai/types";
 
 const FINALITY_BUFFER = 15; // 5-block cushion past REORG_DEPTH
@@ -89,6 +90,7 @@ const TAIL_POLL_MS = 3000;
 const ERROR_BACKOFF_MS = 5000;
 const MARKET_SYNC_MS = 15 * 60_000;
 const SOAP_PARENT_BLOCK_SYNC_MS = 60_000;
+const MINING_POOL_STATS_PARTICIPANT_SYNC_MS = 3 * 60_000;
 
 let shuttingDown = false;
 const sigHandler = (sig: string) => {
@@ -487,11 +489,37 @@ async function maybeSyncSoapParentBlocks(state: {
   }
 }
 
+async function maybeSyncMiningPoolStatsParticipantCounts(state: {
+  lastMiningPoolStatsParticipantSyncAt: number;
+}): Promise<void> {
+  const now = Date.now();
+  if (
+    now - state.lastMiningPoolStatsParticipantSyncAt <
+    MINING_POOL_STATS_PARTICIPANT_SYNC_MS
+  ) {
+    return;
+  }
+  state.lastMiningPoolStatsParticipantSyncAt = now;
+
+  try {
+    const rows = await syncMiningPoolStatsParticipantCounts();
+    console.log(
+      `[ingest] MiningPoolStats participants: ${rows
+        .map((row) => `${row.algo}=${row.miners}`)
+        .join(" ")}`,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[ingest] MiningPoolStats participant sync skipped: ${msg}`);
+  }
+}
+
 async function iterate(state: {
   mode: "backfill" | "tail" | null;
   backfillWroteBlocks: boolean;
   lastMarketSyncAt: number;
   lastSoapParentBlockSyncAt: number;
+  lastMiningPoolStatsParticipantSyncAt: number;
   backfillStart: number;
   backfillStartedAt: number;
   startedAt: number;
@@ -505,6 +533,7 @@ async function iterate(state: {
     getLatestBlockNumber(),
   ]);
   await maybeSyncSoapParentBlocks(state);
+  await maybeSyncMiningPoolStatsParticipantCounts(state);
   const safeHead = head - FINALITY_BUFFER;
   const behind = safeHead - cursor.last_ingested_block;
 
@@ -633,6 +662,7 @@ async function main(): Promise<void> {
     backfillWroteBlocks: false,
     lastMarketSyncAt: 0,
     lastSoapParentBlockSyncAt: 0,
+    lastMiningPoolStatsParticipantSyncAt: 0,
     backfillStart: 0,
     backfillStartedAt: 0,
     startedAt: Date.now(),

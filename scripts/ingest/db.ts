@@ -740,6 +740,48 @@ export async function markSoapParentBlockSync(
   );
 }
 
+export type MiningPoolParticipantCountRow = {
+  algo: "sha" | "scrypt" | "kawpow";
+  miners: number;
+  workers: number;
+  poolCount: number;
+  sourceUpdatedAt: string;
+};
+
+export async function upsertMiningPoolParticipantCounts(
+  rows: MiningPoolParticipantCountRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const values: unknown[] = [];
+  const placeholders: string[] = [];
+  let i = 1;
+  for (const row of rows) {
+    placeholders.push(
+      `($${i},$${i + 1},$${i + 2},$${i + 3},$${i + 4}::timestamptz)`,
+    );
+    values.push(
+      row.algo,
+      row.miners,
+      row.workers,
+      row.poolCount,
+      row.sourceUpdatedAt,
+    );
+    i += 5;
+  }
+  await pool.query(
+    `INSERT INTO mining_pool_participant_counts
+       (algo, miners, workers, pool_count, source_updated_at)
+     VALUES ${placeholders.join(",")}
+     ON CONFLICT (algo) DO UPDATE SET
+       miners = EXCLUDED.miners,
+       workers = EXCLUDED.workers,
+       pool_count = EXCLUDED.pool_count,
+       source_updated_at = EXCLUDED.source_updated_at,
+       fetched_at = now()`,
+    values,
+  );
+}
+
 export async function close(): Promise<void> {
   await pool.end();
 }

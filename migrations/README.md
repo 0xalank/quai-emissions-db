@@ -32,3 +32,4 @@ The runner takes a Postgres advisory lock for the migration session, then tracks
 - `0010_qi_market_data.sql` — Qi quotes and market-price history.
 - `0011_network_activity.sql` — daily transactions and address participation.
 - `0012_soap_parent_blocks.sql` — local BCH/LTC/DOGE/RVN parent-block index.
+- `0013_mining_pool_participant_counts.sql` — cached Quai pool-directory participant totals.

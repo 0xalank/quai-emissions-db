@@ -4,6 +4,17 @@ export type MiningPoolStatsAlgoKey = "sha" | "scrypt" | "kawpow";
 export type MiningPoolStatsTargetKey = "bch" | "ltc" | "doge" | "rvn";
 export type SoapChainKey = "bcash" | "litecoin" | "dogecoin" | "ravencoin";
 
+export type MiningPoolStatsParticipantCounts = {
+  miners: number;
+  workers: number;
+  poolCount: number;
+  sourceUpdatedAt: string;
+};
+
+export type MiningPoolStatsParticipantCountMap = Partial<
+  Record<MiningPoolStatsAlgoKey, MiningPoolStatsParticipantCounts>
+>;
+
 export type MiningPoolStatsFeedConfig = {
   target: MiningPoolStatsTargetKey;
   targetName: string;
@@ -44,8 +55,8 @@ export type MiningPoolStatsFeed = MiningPoolStatsFeedConfig & {
   hashrateEstimated: true;
   hashrateWindowSeconds: 900;
   unit: "H/s";
-  miners: null;
-  workers: null;
+  miners: number | null;
+  workers: number | null;
   machineEquivalent: {
     unit: string;
     baselineHps: number;
@@ -78,8 +89,8 @@ export type MiningPoolStatsPoolRow = {
   hashrate_hps: string;
   hashrate_estimated: true;
   hashrate_window_seconds: 900;
-  miners: -1;
-  workers: -1;
+  miners: number;
+  workers: number;
   lastblock: number;
   lastblockhash: string;
   lastblocktime: number;
@@ -91,6 +102,7 @@ export type MiningPoolStatsPoolRow = {
   source: {
     hashrate: "quai_getMiningInfo";
     blocks: "supply.qu.ai parent-block index";
+    miners: "MiningPoolStats Quai algorithm directory";
   };
   machine_equivalent: {
     unit: string;
@@ -191,6 +203,7 @@ function buildFeed(args: {
   info: MiningInfo;
   config: MiningPoolStatsFeedConfig;
   parentBlocks: MiningPoolStatsParentBlockIndex;
+  participantCounts?: MiningPoolStatsParticipantCounts;
 }): MiningPoolStatsFeed {
   const hashrate = args.info.perAlgo[args.config.algoKey].hashRate;
   const lastFound = args.parentBlocks.blocks[0];
@@ -205,8 +218,11 @@ function buildFeed(args: {
     hashrateEstimated: true,
     hashrateWindowSeconds: 900,
     unit: "H/s",
-    miners: null,
-    workers: null,
+    miners: args.participantCounts?.miners ?? null,
+    workers:
+      args.participantCounts && args.participantCounts.workers >= 0
+        ? args.participantCounts.workers
+        : null,
     machineEquivalent: {
       unit: args.config.machineUnit,
       baselineHps: args.config.machineHashrateHps,
@@ -223,6 +239,7 @@ function buildFeed(args: {
 export function buildMiningPoolStatsPayload(args: {
   info: MiningInfo;
   parentBlocks: Record<MiningPoolStatsTargetKey, MiningPoolStatsParentBlockIndex>;
+  participantCounts?: MiningPoolStatsParticipantCountMap;
   generatedAt?: Date;
 }): MiningPoolStatsPayload {
   const generatedAt = args.generatedAt ?? new Date();
@@ -238,6 +255,7 @@ export function buildMiningPoolStatsPayload(args: {
         info: args.info,
         config,
         parentBlocks: args.parentBlocks[config.target],
+        participantCounts: args.participantCounts?.[config.algoKey],
       }),
     ),
   };
@@ -247,8 +265,12 @@ export function buildMiningPoolStatsPoolPayload(args: {
   info: MiningInfo;
   config: MiningPoolStatsFeedConfig;
   parentBlocks: MiningPoolStatsParentBlockIndex;
+  participantCounts?: MiningPoolStatsParticipantCounts | null;
 }): MiningPoolStatsPoolPayload {
-  const feed = buildFeed(args);
+  const feed = buildFeed({
+    ...args,
+    participantCounts: args.participantCounts ?? undefined,
+  });
   const row: MiningPoolStatsPoolRow = {
     url: "https://qu.ai",
     pool_id: feed.poolId,
@@ -259,8 +281,8 @@ export function buildMiningPoolStatsPoolPayload(args: {
     hashrate_hps: feed.hashrateExact,
     hashrate_estimated: true,
     hashrate_window_seconds: feed.hashrateWindowSeconds,
-    miners: -1,
-    workers: -1,
+    miners: feed.miners ?? -1,
+    workers: feed.workers ?? -1,
     lastblock: feed.lastFound.height,
     lastblockhash: feed.lastFound.hash,
     lastblocktime: feed.lastFound.time,
@@ -272,6 +294,7 @@ export function buildMiningPoolStatsPoolPayload(args: {
     source: {
       hashrate: "quai_getMiningInfo",
       blocks: "supply.qu.ai parent-block index",
+      miners: "MiningPoolStats Quai algorithm directory",
     },
     machine_equivalent: {
       unit: feed.machineEquivalent.unit,

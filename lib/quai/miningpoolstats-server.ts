@@ -2,7 +2,10 @@ import { pool } from "@/lib/db";
 import {
   MINING_POOL_STATS_FEEDS,
   type MiningPoolStatsFeedConfig,
+  type MiningPoolStatsAlgoKey,
   type MiningPoolStatsParentBlockIndex,
+  type MiningPoolStatsParticipantCountMap,
+  type MiningPoolStatsParticipantCounts,
   type MiningPoolStatsTargetKey,
 } from "@/lib/quai/miningpoolstats";
 
@@ -20,6 +23,14 @@ type IndexedBlockRow = {
   total_found: string;
   source_total_count: string;
   last_synced_at: string;
+};
+
+type ParticipantCountRow = {
+  algo: MiningPoolStatsAlgoKey;
+  miners: number;
+  workers: number;
+  pool_count: number;
+  source_updated_at: string;
 };
 
 export function parseMiningPoolStatsBlockLimit(url: URL): number {
@@ -91,4 +102,51 @@ export async function fetchAllIndexedSoapParentBlocks(
     MiningPoolStatsTargetKey,
     MiningPoolStatsParentBlockIndex
   >;
+}
+
+function participantCountsFromRow(
+  row: ParticipantCountRow,
+): MiningPoolStatsParticipantCounts {
+  return {
+    miners: row.miners,
+    workers: row.workers,
+    poolCount: row.pool_count,
+    sourceUpdatedAt: row.source_updated_at,
+  };
+}
+
+export async function fetchIndexedMiningPoolStatsParticipantCounts(
+  algoKey: MiningPoolStatsAlgoKey,
+): Promise<MiningPoolStatsParticipantCounts | null> {
+  const { rows } = await pool.query<ParticipantCountRow>(
+    `SELECT
+       algo,
+       miners,
+       workers,
+       pool_count,
+       to_char(source_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+         AS source_updated_at
+     FROM mining_pool_participant_counts
+     WHERE algo = $1`,
+    [algoKey],
+  );
+  return rows[0] ? participantCountsFromRow(rows[0]) : null;
+}
+
+export async function fetchAllIndexedMiningPoolStatsParticipantCounts(): Promise<
+  MiningPoolStatsParticipantCountMap
+> {
+  const { rows } = await pool.query<ParticipantCountRow>(
+    `SELECT
+       algo,
+       miners,
+       workers,
+       pool_count,
+       to_char(source_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+         AS source_updated_at
+     FROM mining_pool_participant_counts`,
+  );
+  return Object.fromEntries(
+    rows.map((row) => [row.algo, participantCountsFromRow(row)]),
+  );
 }
