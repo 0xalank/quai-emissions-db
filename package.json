@@ -21,6 +21,7 @@
     "backfill:coinbase-rewards": "tsx --env-file=.env.local scripts/ingest/backfill-coinbase-rewards.ts",
     "backfill:network-activity": "tsx --env-file=.env.local scripts/ingest/backfill-coinbase-rewards.ts",
     "backfill:qi-market": "tsx --env-file=.env.local scripts/ingest/backfill-qi-market.ts",
+    "sync:soap-parent-blocks": "tsx --env-file=.env.local scripts/ingest/sync-soap-parent-blocks.ts",
     "backfill:smoke": "tsx --env-file=.env.local scripts/ingest/backfill.ts --limit=1000",
     "rollup": "tsx --env-file=.env.local scripts/ingest/rollup.ts"
   },

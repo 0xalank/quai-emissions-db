@@ -25,7 +25,7 @@ cp .env.local.example .env.local
 $EDITOR .env.local        # set DATABASE_URL; RPC defaults are usable
 npm run validate:env
 
-# 3. apply schema (eight migrations, idempotent, transaction-wrapped)
+# 3. apply schema (idempotent, transaction-wrapped)
 npm run migrate
 
 # 4. first-run smoke test, then start the ingest worker
@@ -93,6 +93,7 @@ The example file (`.env.local.example`) is the canonical reference. The
 | `npm run ingest` | Unified backfill + tail worker. Backfills from genesis to `(head − FINALITY_BUFFER)` in 10k-block chunks, then enters tail mode polling every 3 s. |
 | `npm run backfill` | Backfill-only worker (does not enter tail). Accepts `--limit=N` and `--chunk=N`. |
 | `npm run backfill:smoke` | Backfill-only smoke test capped at 1,000 blocks. Use this before starting the long-running ingest on a fresh VM. |
+| `npm run sync:soap-parent-blocks` | Backfill or refresh the local BCH/LTC/DOGE/RVN blocks found through SOAP. |
 | `npm run rollup` | Full rebuild of `rollups_daily/weekly/monthly`. Normally run automatically on each tail tick — invoke manually only if a column changes or you suspect drift. |
 | `npm run deploy:check` | Production host checklist for systemd service status, nginx config, and local `/api/health`. |
 
@@ -128,6 +129,7 @@ Internal-stable. Documented for transparency, not contract.
 | `/api/coinbase-leaderboard?days=&limit=` | top coinbases by blocks won | 5 m |
 | `/api/pow-markets` | CoinGecko price and market-cap quotes for tracked PoW networks | 60 s + 5 m SWR |
 | `/api/pow-market-history?from=&to=` | CoinGecko daily historical prices for tracked PoW networks | 30 m + 1 h SWR |
+| `/api/miningpoolstats/{bch,ltc,doge,rvn}?blocks=N` | MiningPoolStats-compatible pool feed with up to 1,000 recent indexed parent blocks | 60 s + 5 m SWR |
 
 ---
 
@@ -151,7 +153,7 @@ re-aggregate the affected periods only.
 
 ### Schema
 
-8 migrations in `migrations/` (see `migrations/README.md` for conventions):
+12 migrations in `migrations/` (see `migrations/README.md` for conventions):
 
 - `0001_init.sql` — `blocks`, `supply_analytics`, `ingest_cursor`
 - `0002_rollups.sql` — `rollups_daily/weekly/monthly`
@@ -160,6 +162,10 @@ re-aggregate the affected periods only.
 - `0005_soap_mining.sql` — per-algorithm columns + `mining_info` table
 - `0006_supply_views.sql` + `0008_supply_views_fix.sql` — realized-supply views
 - `0007_coinbase_index.sql` — `(primary_coinbase, ts DESC)` index
+- `0009_coinbase_rewards.sql` — exact outbound coinbase reward index
+- `0010_qi_market_data.sql` — historical Qi quotes and QUAI market prices
+- `0011_network_activity.sql` — daily transactions and address activity
+- `0012_soap_parent_blocks.sql` — locally indexed SOAP parent-chain blocks
 
 ### Sampling
 

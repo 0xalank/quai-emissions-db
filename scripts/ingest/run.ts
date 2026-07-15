@@ -68,6 +68,7 @@ import {
 } from "./db";
 import { runRollups } from "./rollup";
 import { syncQiMarketData } from "./qi-market";
+import { syncSoapParentBlocks } from "./soap-parent-blocks";
 import type { NormalizedBlock } from "../../lib/quai/types";
 
 const FINALITY_BUFFER = 15; // 5-block cushion past REORG_DEPTH
@@ -87,6 +88,7 @@ const BACKFILL_CHUNK = 10_000;
 const TAIL_POLL_MS = 3000;
 const ERROR_BACKOFF_MS = 5000;
 const MARKET_SYNC_MS = 15 * 60_000;
+const SOAP_PARENT_BLOCK_SYNC_MS = 60_000;
 
 let shuttingDown = false;
 const sigHandler = (sig: string) => {
@@ -465,10 +467,31 @@ async function maybeSyncQiMarketData(state: {
   }
 }
 
+async function maybeSyncSoapParentBlocks(state: {
+  lastSoapParentBlockSyncAt: number;
+}): Promise<void> {
+  const now = Date.now();
+  if (now - state.lastSoapParentBlockSyncAt < SOAP_PARENT_BLOCK_SYNC_MS) return;
+  state.lastSoapParentBlockSyncAt = now;
+
+  try {
+    const results = await syncSoapParentBlocks();
+    console.log(
+      `[ingest] SOAP parent blocks: ${results
+        .map((result) => `${result.target}=${result.indexed}/${result.sourceTotal}`)
+        .join(" ")}`,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[ingest] SOAP parent-block sync skipped: ${msg}`);
+  }
+}
+
 async function iterate(state: {
   mode: "backfill" | "tail" | null;
   backfillWroteBlocks: boolean;
   lastMarketSyncAt: number;
+  lastSoapParentBlockSyncAt: number;
   backfillStart: number;
   backfillStartedAt: number;
   startedAt: number;
@@ -481,6 +504,7 @@ async function iterate(state: {
     getCursor(),
     getLatestBlockNumber(),
   ]);
+  await maybeSyncSoapParentBlocks(state);
   const safeHead = head - FINALITY_BUFFER;
   const behind = safeHead - cursor.last_ingested_block;
 
@@ -600,6 +624,7 @@ async function main(): Promise<void> {
     mode: null as "backfill" | "tail" | null,
     backfillWroteBlocks: false,
     lastMarketSyncAt: 0,
+    lastSoapParentBlockSyncAt: 0,
     backfillStart: 0,
     backfillStartedAt: 0,
     startedAt: Date.now(),

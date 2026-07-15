@@ -5,13 +5,16 @@ import {
   buildMiningPoolStatsPoolPayload,
   miningPoolStatsFeedForTarget,
 } from "@/lib/quai/miningpoolstats";
-import { fetchLatestSoapParentBlock } from "@/lib/quai/miningpoolstats-server";
+import {
+  fetchIndexedSoapParentBlocks,
+  parseMiningPoolStatsBlockLimit,
+} from "@/lib/quai/miningpoolstats-server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ network: string }> },
 ) {
   try {
@@ -24,12 +27,13 @@ export async function GET(
       );
     }
 
-    const [info, parentBlock] = await Promise.all([
+    const blockLimit = parseMiningPoolStatsBlockLimit(new URL(req.url));
+    const [info, parentBlocks] = await Promise.all([
       fetchMiningInfo(),
-      fetchLatestSoapParentBlock(config),
+      fetchIndexedSoapParentBlocks(config, blockLimit),
     ]);
     return NextResponse.json(
-      buildMiningPoolStatsPoolPayload({ info, config, parentBlock }),
+      buildMiningPoolStatsPoolPayload({ info, config, parentBlocks }),
       {
         headers: {
           "cache-control": "s-maxage=60, stale-while-revalidate=300",

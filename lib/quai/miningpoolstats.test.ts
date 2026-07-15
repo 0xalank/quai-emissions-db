@@ -5,6 +5,7 @@ import {
   buildMiningPoolStatsPoolPayload,
   miningPoolStatsFeedForTarget,
   type MiningPoolStatsParentBlock,
+  type MiningPoolStatsParentBlockIndex,
   type MiningPoolStatsTargetKey,
 } from "@/lib/quai/miningpoolstats";
 import type { MiningInfo } from "@/lib/quai/types";
@@ -54,18 +55,42 @@ function parentBlock(
     time: 1_700_000_000 + height,
     reward: height / 100,
     coinbaseTxid: `${target}-coinbase-txid`,
-    totalFound: height * 2,
+    priceUsd: height / 10,
   };
 }
 
 const parentBlocks: Record<
   MiningPoolStatsTargetKey,
-  MiningPoolStatsParentBlock
+  MiningPoolStatsParentBlockIndex
 > = {
-  bch: parentBlock("bch", 100),
-  ltc: parentBlock("ltc", 200),
-  doge: parentBlock("doge", 300),
-  rvn: parentBlock("rvn", 400),
+  bch: {
+    chain: "bcash",
+    totalFound: 200,
+    sourceTotal: 200,
+    lastSyncedAt: "2026-07-14T00:00:00.000Z",
+    blocks: [parentBlock("bch", 100), parentBlock("bch", 99)],
+  },
+  ltc: {
+    chain: "litecoin",
+    totalFound: 400,
+    sourceTotal: 400,
+    lastSyncedAt: "2026-07-14T00:00:00.000Z",
+    blocks: [parentBlock("ltc", 200), parentBlock("ltc", 199)],
+  },
+  doge: {
+    chain: "dogecoin",
+    totalFound: 600,
+    sourceTotal: 600,
+    lastSyncedAt: "2026-07-14T00:00:00.000Z",
+    blocks: [parentBlock("doge", 300), parentBlock("doge", 299)],
+  },
+  rvn: {
+    chain: "ravencoin",
+    totalFound: 800,
+    sourceTotal: 800,
+    lastSyncedAt: "2026-07-14T00:00:00.000Z",
+    blocks: [parentBlock("rvn", 400), parentBlock("rvn", 399)],
+  },
 };
 
 test("builds four parent-network feeds with separate LTC and DOGE blocks", () => {
@@ -87,6 +112,8 @@ test("builds four parent-network feeds with separate LTC and DOGE blocks", () =>
   assert.equal(ltc.hashrateExact, "32000000000000");
   assert.equal(ltc.lastFound.height, 200);
   assert.equal(doge.lastFound.height, 300);
+  assert.equal(ltc.totalFound, 400);
+  assert.equal(doge.recentBlocks.length, 2);
   assert.equal(ltc.apiPath, "/api/miningpoolstats/ltc");
   assert.equal(doge.apiPath, "/api/miningpoolstats/doge");
 });
@@ -97,16 +124,33 @@ test("pool payload uses parent blocks and does not claim machine estimates are m
   const payload = buildMiningPoolStatsPoolPayload({
     info,
     config,
-    parentBlock: parentBlocks.bch,
+    parentBlocks: parentBlocks.bch,
   });
 
   assert.equal(payload.symbol, "BCH");
   assert.equal(payload.url, "https://qu.ai");
+  assert.equal(payload.name, "Quai Network");
+  assert.equal(payload.pool_id, "quai-sha");
   assert.equal(payload.hashrate, 400_000_000_000_000_000);
   assert.equal(payload.hashrate_hps, "400000000000000000");
   assert.equal(payload.lastblock, 100);
   assert.equal(payload.lastblockhash, "bch-block-hash");
   assert.equal(payload.lastblocktime, 1_700_000_100);
+  assert.equal(payload.blocks_nr, 200);
+  assert.equal(payload.blocks.length, 2);
+  assert.deepEqual(payload.blocks[0], {
+    chain: "bcash",
+    symbol: "BCH",
+    height: 100,
+    hash: "bch-block-hash",
+    time: 1_700_000_100,
+    reward: 1,
+    coinbase_txid: "bch-coinbase-txid",
+    price_usd: 10,
+  });
+  assert.equal(payload.blocks_indexed, 200);
+  assert.equal(payload.blocks_source_total, 200);
+  assert.equal(payload.blocks_last_synced_at, "2026-07-14T00:00:00.000Z");
   assert.equal(payload.miners, -1);
   assert.equal(payload.workers, -1);
   assert.equal(payload.machine_equivalent.count, 2_000);
@@ -114,6 +158,13 @@ test("pool payload uses parent blocks and does not claim machine estimates are m
   assert.equal("fee" in payload, false);
   assert.equal("minpay" in payload, false);
   assert.equal("country" in payload, false);
+});
+
+test("uses algorithm-level pool ids across parent-network lists", () => {
+  assert.equal(miningPoolStatsFeedForTarget("bch")?.poolId, "quai-sha");
+  assert.equal(miningPoolStatsFeedForTarget("ltc")?.poolId, "quai-scrypt");
+  assert.equal(miningPoolStatsFeedForTarget("doge")?.poolId, "quai-scrypt");
+  assert.equal(miningPoolStatsFeedForTarget("rvn")?.poolId, "quai-kawpow");
 });
 
 test("rejects the old ambiguous algorithm routes", () => {

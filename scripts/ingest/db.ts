@@ -654,6 +654,92 @@ export async function upsertQiDailyQuotes(
   }
 }
 
+export type SoapParentBlockRow = {
+  chain: "bcash" | "litecoin" | "dogecoin" | "ravencoin";
+  height: number;
+  hash: string;
+  time: number;
+  reward: number;
+  coinbaseTxid: string;
+  priceUsd: number | null;
+};
+
+const SOAP_PARENT_BLOCK_PARAMS_PER_ROW = 7;
+
+async function upsertSoapParentBlocksChunk(
+  rows: SoapParentBlockRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const values: unknown[] = [];
+  const placeholders: string[] = [];
+  let i = 1;
+  for (const row of rows) {
+    placeholders.push(
+      `($${i},$${i + 1},$${i + 2},to_timestamp($${i + 3}),$${i + 4},$${i + 5},$${i + 6})`,
+    );
+    values.push(
+      row.chain,
+      row.height,
+      hexToBytea(row.hash),
+      row.time,
+      row.reward,
+      hexToBytea(row.coinbaseTxid),
+      row.priceUsd,
+    );
+    i += SOAP_PARENT_BLOCK_PARAMS_PER_ROW;
+  }
+
+  await pool.query(
+    `INSERT INTO soap_parent_blocks
+       (chain, block_height, block_hash, block_time, reward, coinbase_txid, price_usd)
+     VALUES ${placeholders.join(",")}
+     ON CONFLICT (chain, block_hash) DO UPDATE SET
+       block_height  = EXCLUDED.block_height,
+       block_time    = EXCLUDED.block_time,
+       reward        = EXCLUDED.reward,
+       coinbase_txid = EXCLUDED.coinbase_txid,
+       price_usd     = EXCLUDED.price_usd,
+       indexed_at    = now()`,
+    values,
+  );
+}
+
+export async function upsertSoapParentBlocks(
+  rows: SoapParentBlockRow[],
+): Promise<void> {
+  const deduped = [
+    ...new Map(rows.map((row) => [`${row.chain}:${row.hash}`, row])).values(),
+  ];
+  const max = maxRowsPerStmt(SOAP_PARENT_BLOCK_PARAMS_PER_ROW);
+  for (let i = 0; i < deduped.length; i += max) {
+    await upsertSoapParentBlocksChunk(deduped.slice(i, i + max));
+  }
+}
+
+export async function getSoapParentBlockCount(chain: string): Promise<number> {
+  const { rows } = await pool.query<{ count: string }>(
+    `SELECT count(*)::bigint::text AS count
+       FROM soap_parent_blocks
+      WHERE chain = $1`,
+    [chain],
+  );
+  return Number(rows[0]?.count ?? 0);
+}
+
+export async function markSoapParentBlockSync(
+  chain: string,
+  sourceTotalCount: number,
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO soap_parent_block_sync (chain, source_total_count, last_synced_at)
+     VALUES ($1, $2, now())
+     ON CONFLICT (chain) DO UPDATE SET
+       source_total_count = EXCLUDED.source_total_count,
+       last_synced_at = now()`,
+    [chain, sourceTotalCount],
+  );
+}
+
 export async function close(): Promise<void> {
   await pool.end();
 }

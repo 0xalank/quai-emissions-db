@@ -11,6 +11,7 @@ export type MiningPoolStatsFeedConfig = {
   page: string;
   url: string;
   apiPath: string;
+  poolId: "quai-sha" | "quai-scrypt" | "quai-kawpow";
   algoKey: MiningPoolStatsAlgoKey;
   algo: string;
   soapChain: SoapChainKey;
@@ -25,11 +26,19 @@ export type MiningPoolStatsParentBlock = {
   time: number;
   reward: number;
   coinbaseTxid: string;
+  priceUsd: number | null;
+};
+
+export type MiningPoolStatsParentBlockIndex = {
+  chain: SoapChainKey;
   totalFound: number;
+  sourceTotal: number;
+  lastSyncedAt: string;
+  blocks: MiningPoolStatsParentBlock[];
 };
 
 export type MiningPoolStatsFeed = MiningPoolStatsFeedConfig & {
-  name: "Quai SOAP";
+  name: "Quai Network";
   hashrate: number;
   hashrateExact: string;
   hashrateEstimated: true;
@@ -42,7 +51,11 @@ export type MiningPoolStatsFeed = MiningPoolStatsFeedConfig & {
     baselineHps: number;
     count: number;
   };
+  totalFound: number;
+  sourceTotal: number;
   lastFound: MiningPoolStatsParentBlock;
+  recentBlocks: MiningPoolStatsParentBlock[];
+  blocksLastSyncedAt: string;
 };
 
 export type MiningPoolStatsPayload = {
@@ -50,15 +63,15 @@ export type MiningPoolStatsPayload = {
   poolUrl: "https://qu.ai";
   source: {
     hashrate: "quai_getMiningInfo (15-minute estimate)";
-    blocks: "https://soap.qu.ai/api/blocks";
+    blocks: "local Postgres parent-block index";
   };
   feeds: MiningPoolStatsFeed[];
 };
 
 export type MiningPoolStatsPoolRow = {
   url: "https://qu.ai";
-  pool_id: string;
-  name: "Quai SOAP";
+  pool_id: "quai-sha" | "quai-scrypt" | "quai-kawpow";
+  name: "Quai Network";
   symbol: "BCH" | "LTC" | "DOGE" | "RVN";
   algo: string;
   hashrate: number;
@@ -77,7 +90,7 @@ export type MiningPoolStatsPoolRow = {
   pool_type: "SOAP meta-pool";
   source: {
     hashrate: "quai_getMiningInfo";
-    blocks: "soap.qu.ai/api/blocks";
+    blocks: "supply.qu.ai parent-block index";
   };
   machine_equivalent: {
     unit: string;
@@ -86,8 +99,23 @@ export type MiningPoolStatsPoolRow = {
   };
 };
 
+export type MiningPoolStatsPoolBlock = {
+  chain: SoapChainKey;
+  symbol: "BCH" | "LTC" | "DOGE" | "RVN";
+  height: number;
+  hash: string;
+  time: number;
+  reward: number;
+  coinbase_txid: string;
+  price_usd: number | null;
+};
+
 export type MiningPoolStatsPoolPayload = MiningPoolStatsPoolRow & {
   data: MiningPoolStatsPoolRow[];
+  blocks: MiningPoolStatsPoolBlock[];
+  blocks_indexed: number;
+  blocks_source_total: number;
+  blocks_last_synced_at: string;
 };
 
 export const MINING_POOL_STATS_FEEDS: MiningPoolStatsFeedConfig[] = [
@@ -98,6 +126,7 @@ export const MINING_POOL_STATS_FEEDS: MiningPoolStatsFeedConfig[] = [
     page: "bitcoincash",
     url: "https://miningpoolstats.stream/bitcoincash",
     apiPath: "/api/miningpoolstats/bch",
+    poolId: "quai-sha",
     algoKey: "sha",
     algo: "SHA-256",
     soapChain: "bcash",
@@ -111,6 +140,7 @@ export const MINING_POOL_STATS_FEEDS: MiningPoolStatsFeedConfig[] = [
     page: "litecoin",
     url: "https://miningpoolstats.stream/litecoin",
     apiPath: "/api/miningpoolstats/ltc",
+    poolId: "quai-scrypt",
     algoKey: "scrypt",
     algo: "Scrypt",
     soapChain: "litecoin",
@@ -124,6 +154,7 @@ export const MINING_POOL_STATS_FEEDS: MiningPoolStatsFeedConfig[] = [
     page: "dogecoin",
     url: "https://miningpoolstats.stream/dogecoin",
     apiPath: "/api/miningpoolstats/doge",
+    poolId: "quai-scrypt",
     algoKey: "scrypt",
     algo: "Scrypt",
     soapChain: "dogecoin",
@@ -137,6 +168,7 @@ export const MINING_POOL_STATS_FEEDS: MiningPoolStatsFeedConfig[] = [
     page: "ravencoin",
     url: "https://miningpoolstats.stream/ravencoin",
     apiPath: "/api/miningpoolstats/rvn",
+    poolId: "quai-kawpow",
     algoKey: "kawpow",
     algo: "KawPow",
     soapChain: "ravencoin",
@@ -151,22 +183,23 @@ export function miningPoolStatsFeedForTarget(
   return MINING_POOL_STATS_FEEDS.find((feed) => feed.target === target) ?? null;
 }
 
-function machineEquivalent(
-  hashrate: bigint,
-  baselineHps: number,
-): number {
+function machineEquivalent(hashrate: bigint, baselineHps: number): number {
   return Math.max(0, Math.round(Number(hashrate) / baselineHps));
 }
 
 function buildFeed(args: {
   info: MiningInfo;
   config: MiningPoolStatsFeedConfig;
-  parentBlock: MiningPoolStatsParentBlock;
+  parentBlocks: MiningPoolStatsParentBlockIndex;
 }): MiningPoolStatsFeed {
   const hashrate = args.info.perAlgo[args.config.algoKey].hashRate;
+  const lastFound = args.parentBlocks.blocks[0];
+  if (!lastFound) {
+    throw new Error(`No indexed ${args.config.targetSymbol} parent blocks`);
+  }
   return {
     ...args.config,
-    name: "Quai SOAP",
+    name: "Quai Network",
     hashrate: Number(hashrate),
     hashrateExact: hashrate.toString(),
     hashrateEstimated: true,
@@ -179,13 +212,17 @@ function buildFeed(args: {
       baselineHps: args.config.machineHashrateHps,
       count: machineEquivalent(hashrate, args.config.machineHashrateHps),
     },
-    lastFound: args.parentBlock,
+    totalFound: args.parentBlocks.totalFound,
+    sourceTotal: args.parentBlocks.sourceTotal,
+    lastFound,
+    recentBlocks: args.parentBlocks.blocks,
+    blocksLastSyncedAt: args.parentBlocks.lastSyncedAt,
   };
 }
 
 export function buildMiningPoolStatsPayload(args: {
   info: MiningInfo;
-  parentBlocks: Record<MiningPoolStatsTargetKey, MiningPoolStatsParentBlock>;
+  parentBlocks: Record<MiningPoolStatsTargetKey, MiningPoolStatsParentBlockIndex>;
   generatedAt?: Date;
 }): MiningPoolStatsPayload {
   const generatedAt = args.generatedAt ?? new Date();
@@ -194,13 +231,13 @@ export function buildMiningPoolStatsPayload(args: {
     poolUrl: "https://qu.ai",
     source: {
       hashrate: "quai_getMiningInfo (15-minute estimate)",
-      blocks: "https://soap.qu.ai/api/blocks",
+      blocks: "local Postgres parent-block index",
     },
     feeds: MINING_POOL_STATS_FEEDS.map((config) =>
       buildFeed({
         info: args.info,
         config,
-        parentBlock: args.parentBlocks[config.target],
+        parentBlocks: args.parentBlocks[config.target],
       }),
     ),
   };
@@ -209,13 +246,13 @@ export function buildMiningPoolStatsPayload(args: {
 export function buildMiningPoolStatsPoolPayload(args: {
   info: MiningInfo;
   config: MiningPoolStatsFeedConfig;
-  parentBlock: MiningPoolStatsParentBlock;
+  parentBlocks: MiningPoolStatsParentBlockIndex;
 }): MiningPoolStatsPoolPayload {
   const feed = buildFeed(args);
   const row: MiningPoolStatsPoolRow = {
     url: "https://qu.ai",
-    pool_id: `quai-soap-${feed.target}`,
-    name: "Quai SOAP",
+    pool_id: feed.poolId,
+    name: "Quai Network",
     symbol: feed.targetSymbol,
     algo: feed.algo,
     hashrate: feed.hashrate,
@@ -227,14 +264,14 @@ export function buildMiningPoolStatsPoolPayload(args: {
     lastblock: feed.lastFound.height,
     lastblockhash: feed.lastFound.hash,
     lastblocktime: feed.lastFound.time,
-    blocks_nr: feed.lastFound.totalFound,
+    blocks_nr: feed.totalFound,
     reward: feed.lastFound.reward,
     coinbase_txid: feed.lastFound.coinbaseTxid,
     unit: "H/s",
     pool_type: "SOAP meta-pool",
     source: {
       hashrate: "quai_getMiningInfo",
-      blocks: "soap.qu.ai/api/blocks",
+      blocks: "supply.qu.ai parent-block index",
     },
     machine_equivalent: {
       unit: feed.machineEquivalent.unit,
@@ -242,5 +279,22 @@ export function buildMiningPoolStatsPoolPayload(args: {
       count: feed.machineEquivalent.count,
     },
   };
-  return { ...row, data: [row] };
+  const blocks: MiningPoolStatsPoolBlock[] = feed.recentBlocks.map((block) => ({
+    chain: block.chain,
+    symbol: feed.targetSymbol,
+    height: block.height,
+    hash: block.hash,
+    time: block.time,
+    reward: block.reward,
+    coinbase_txid: block.coinbaseTxid,
+    price_usd: block.priceUsd,
+  }));
+  return {
+    ...row,
+    data: [row],
+    blocks,
+    blocks_indexed: feed.totalFound,
+    blocks_source_total: feed.sourceTotal,
+    blocks_last_synced_at: feed.blocksLastSyncedAt,
+  };
 }

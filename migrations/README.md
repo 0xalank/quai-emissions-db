@@ -22,3 +22,13 @@ The runner takes a Postgres advisory lock for the migration session, then tracks
 
 - `0001_init.sql` — `blocks`, `supply_analytics` (with `soap_burn_balance`), `ingest_cursor`.
 - `0002_rollups.sql` — `rollups_daily`, `rollups_weekly`, `rollups_monthly`.
+- `0003_reorg_log.sql` — append-only reorg audit records.
+- `0004_avg_block_time.sql` — period-level average block times.
+- `0005_soap_mining.sql` — SOAP workshare and mining-info columns.
+- `0006_supply_views.sql` — realized supply views.
+- `0007_coinbase_index.sql` — primary coinbase lookup index.
+- `0008_supply_views_fix.sql` — corrected realized supply semantics.
+- `0009_coinbase_rewards.sql` — exact outbound coinbase rewards.
+- `0010_qi_market_data.sql` — Qi quotes and market-price history.
+- `0011_network_activity.sql` — daily transactions and address participation.
+- `0012_soap_parent_blocks.sql` — local BCH/LTC/DOGE/RVN parent-block index.

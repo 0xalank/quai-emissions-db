@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiServerError } from "@/lib/api-helpers";
 import { buildMiningPoolStatsPayload } from "@/lib/quai/miningpoolstats";
-import { fetchLatestSoapParentBlocks } from "@/lib/quai/miningpoolstats-server";
+import { fetchAllIndexedSoapParentBlocks } from "@/lib/quai/miningpoolstats-server";
 import { fetchMiningInfo } from "@/lib/quai/endpoints";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export async function GET() {
   try {
     const [info, parentBlocks] = await Promise.all([
       fetchMiningInfo(),
-      fetchLatestSoapParentBlocks(),
+      fetchAllIndexedSoapParentBlocks(10),
     ]);
 
     return NextResponse.json(
