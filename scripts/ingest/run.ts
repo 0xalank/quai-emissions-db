@@ -534,7 +534,15 @@ async function iterate(state: {
       sampleEvery: BACKFILL_SAMPLE_EVERY,
     });
     state.blocksWritten += n;
-    state.backfillWroteBlocks ||= n > 0;
+    if (cursor.backfill_done && n > 0) {
+      // A completed database can briefly fall behind after a restart or slow
+      // RPC call. Recompute only the periods touched by this catch-up batch;
+      // a full rebuild is reserved for the initial historical backfill.
+      await runRollups(from);
+      await maybeSyncQiMarketData(state);
+    } else {
+      state.backfillWroteBlocks ||= n > 0;
+    }
 
     const chunkElapsed = (Date.now() - chunkStart) / 1000;
     const totalDone = cursor.last_ingested_block + n - state.backfillStart;
