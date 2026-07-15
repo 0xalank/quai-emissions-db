@@ -12,6 +12,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "test:miningpoolstats": "node --import tsx --test lib/quai/miningpoolstats.test.ts",
     "migrate": "npm run validate:env && tsx --env-file=.env.local scripts/migrate.ts",
     "reset:db": "tsx --env-file=.env.local scripts/reset-db.ts",
     "ingest": "tsx --env-file=.env.local scripts/ingest/run.ts",
